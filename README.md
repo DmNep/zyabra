@@ -4,7 +4,7 @@
 
 `ghbdtn` становится `привет`, `руддщ` становится `hello`.
 
-Скачать: [последний релиз](https://github.com/DmNep/zyabra/releases/latest) ([zyabra.exe](https://github.com/DmNep/zyabra/releases/latest/download/zyabra.exe)).
+Скачать: [последний релиз](https://github.com/DmNep/zyabra/releases/latest) ([zyabra-0.1.2.exe](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.2.exe)).
 
 ## Что программа не делает
 
@@ -54,13 +54,13 @@ cargo test
 cargo build --release
 ```
 
-Готовый файл: `target/release/zyabra.exe`. Подпись кода нет, SmartScreen может спросить подтверждение при первом запуске.
+Готовый файл: `target/release/zyabra.exe`. В релизе он называется `zyabra-0.1.2.exe`: версия стоит после названия. Подпись кода нет, SmartScreen может спросить подтверждение при первом запуске.
 
 ## Словари
 
 Английский список — ENABLE, public domain. Русский — словоформы из [danakt/russian-words](https://github.com/danakt/russian-words), MIT. Подробности в `NOTICE.md`.
 
-`tools/build_dicts.py` заново собирает `dictionaries/` из уже скачанных файлов в `third_party/`. Программа этот скрипт не запускает.
+`tools/build_dicts.py` заново собирает `dictionaries/` из уже скачанных файлов в `third_party/`. Программа этот скрипт не запускает. В файл Зябры списки попадают сжатыми и разворачиваются в памяти при запуске.
 
 ## Ограничения
 

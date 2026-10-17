@@ -1,3 +1,7 @@
+use std::io::Read;
+
+use flate2::read::GzDecoder;
+
 use crate::keymap::Script;
 
 pub trait HasWords {
@@ -36,14 +40,22 @@ pub struct StaticDict {
 
 impl StaticDict {
     pub fn load() -> Self {
-        let mut en = collect(include_str!("../dictionaries/en.txt"), is_en_word);
-        let mut ru = collect(include_str!("../dictionaries/ru.txt"), is_ru_word);
+        let mut en = collect(inflate(include_bytes!(concat!(env!("OUT_DIR"), "/en.txt.gz"))), is_en_word);
+        let mut ru = collect(inflate(include_bytes!(concat!(env!("OUT_DIR"), "/ru.txt.gz"))), is_ru_word);
         en.sort_unstable();
         en.dedup();
         ru.sort_unstable();
         ru.dedup();
         Self { en, ru }
     }
+}
+
+fn inflate(bytes: &[u8]) -> &'static str {
+    let mut text = String::new();
+    GzDecoder::new(bytes)
+        .read_to_string(&mut text)
+        .expect("embedded dictionary");
+    Box::leak(text.into_boxed_str())
 }
 
 impl HasWords for StaticDict {

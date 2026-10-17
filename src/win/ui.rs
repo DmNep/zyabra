@@ -1,30 +1,38 @@
 use windows::core::w;
-use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
+use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    CreateBitmap, CreateDIBSection, DeleteObject, GetDC, ReleaseDC, BITMAPINFO, BITMAPINFOHEADER,
-    BI_RGB, COLOR_WINDOW, DIB_RGB_COLORS, HBITMAP, HBRUSH,
+    CreateBitmap, CreateDIBSection, CreateFontW, DeleteObject, GetDC, ReleaseDC, SetBkMode,
+    SetTextColor, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, CLEARTYPE_QUALITY, CLIP_DEFAULT_PRECIS,
+    COLOR_WINDOW, DEFAULT_CHARSET, DEFAULT_PITCH, DIB_RGB_COLORS, FW_NORMAL, HBITMAP, HBRUSH,
+    HDC, OUT_DEFAULT_PRECIS, TRANSPARENT,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Shell::{
-    Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NOTIFYICONDATAW,
+    ShellExecuteW, Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE,
+    NOTIFYICONDATAW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyIcon, DestroyMenu,
     DestroyWindow, DispatchMessageW, GetCursorPos, GetMessageW, LoadCursorW, LoadIconW,
-    PostMessageW, PostQuitMessage, RegisterClassExW, SetForegroundWindow, SetWindowTextW,
-    ShowWindow, TrackPopupMenuEx, TranslateMessage, CS_HREDRAW, CS_VREDRAW, HICON, HMENU,
-    IDC_ARROW, IDI_APPLICATION, MF_STRING, MSG, SW_RESTORE, TPM_BOTTOMALIGN, TPM_RIGHTALIGN,
-    WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_LBUTTONUP,
-    WM_NULL, WM_RBUTTONUP, WNDCLASSEXW, WS_CAPTION, WS_CHILD, WS_MINIMIZEBOX, WS_OVERLAPPED,
-    WS_SYSMENU, WS_VISIBLE,
+    GetClientRect, PostMessageW, PostQuitMessage, RegisterClassExW, SendMessageW,
+    SetForegroundWindow, SetWindowTextW, ShowWindow, TrackPopupMenuEx, TranslateMessage,
+    CS_HREDRAW, CS_VREDRAW, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, MF_STRING, MSG, SW_RESTORE,
+    SW_SHOWNORMAL, TPM_BOTTOMALIGN, TPM_RIGHTALIGN, WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLOSE,
+    WM_COMMAND, WM_CREATE, WM_CTLCOLORSTATIC, WM_DESTROY, WM_LBUTTONUP, WM_NULL, WM_RBUTTONUP,
+    WM_SETFONT, WNDCLASSEXW, WS_CAPTION, WS_CHILD, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU,
+    WS_VISIBLE,
 };
 
 use super::{set_enabled, utf16};
 
 const WM_TRAY: u32 = 0x8000 + 1;
+const SS_NOTIFY: u32 = 256;
 const IDC_TOGGLE: u16 = 1;
 const IDC_EXIT: u16 = 2;
+const IDC_LINK: u16 = 3;
 const CLASS: windows::core::PCWSTR = w!("ZyabraWindow");
+const TITLE: &str = concat!("Зябра ", env!("CARGO_PKG_VERSION"));
+const REPO: &str = "https://github.com/DmNep/zyabra";
 
 pub(super) fn run_window() -> Result<(), String> {
     unsafe {
@@ -55,15 +63,16 @@ pub(super) fn run_window() -> Result<(), String> {
             return Err("не удалось зарегистрировать окно".to_string());
         }
 
+        let title = utf16(TITLE);
         let hwnd = CreateWindowExW(
             WINDOW_EX_STYLE::default(),
             CLASS,
-            w!("Зябра"),
+            windows::core::PCWSTR(title.as_ptr()),
             WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE,
             120,
-            120,
-            520,
-            360,
+            80,
+            540,
+            560,
             None,
             None,
             Some(instance),
@@ -135,6 +144,17 @@ unsafe extern "system" fn wnd_proc(
             create_children(hwnd);
             LRESULT(0)
         }
+        WM_CTLCOLORSTATIC => {
+            let child = HWND(lparam.0 as *mut core::ffi::c_void);
+            if child == super::ui().link {
+                let dc = HDC(wparam.0 as *mut core::ffi::c_void);
+                let _ = SetTextColor(dc, COLORREF(0x00C0_6000));
+                let _ = SetBkMode(dc, TRANSPARENT);
+                LRESULT((COLOR_WINDOW.0 as isize) + 1)
+            } else {
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+        }
         WM_COMMAND => {
             match (wparam.0 & 0xFFFF) as u16 {
                 IDC_TOGGLE => {
@@ -143,6 +163,7 @@ unsafe extern "system" fn wnd_proc(
                 IDC_EXIT => {
                     let _ = DestroyWindow(hwnd);
                 }
+                IDC_LINK => open_repo(),
                 _ => {}
             }
             LRESULT(0)
@@ -182,42 +203,44 @@ fn create_children(parent: HWND) {
     unsafe {
         let _ = static_text(
             parent,
+            "Pause - исправить текущее слово.",
+            24,
+            16,
+            480,
+            28,
+            text_style,
+        );
+        let _ = static_text(
+            parent,
             "Если слово набрано не в той раскладке, Зябра стирает его и пишет заново в правильной, затем переключает раскладку.",
             24,
-            20,
-            460,
-            72,
+            48,
+            480,
+            64,
             text_style,
         );
+        let _ = static_text(parent, "Безопасность:", 24, 120, 480, 24, text_style);
         let _ = static_text(
             parent,
-            "В памяти только текущее слово и одна последняя замена. На диск текст не пишется. В интернет программа не ходит. Поля пароля не читаются.",
+            "В памяти только текущее слово и одна последняя замена. На диск набранное не пишется. В интернет программа не ходит: словарь уже внутри файла. Поля пароля не читаются. «Пауза» останавливает обработку.",
             24,
+            148,
+            480,
             96,
-            460,
-            72,
-            text_style,
-        );
-        let _ = static_text(
-            parent,
-            "Pause — исправить текущее слово или отменить последнюю замену.",
-            24,
-            172,
-            460,
-            32,
             text_style,
         );
         let status = static_text(
             parent,
             "Включена. Набранное никуда не сохраняется.",
             24,
-            214,
-            460,
+            256,
+            480,
             28,
             text_style,
         );
-        let toggle = button(parent, "Пауза", 24, 252, 140, 32, IDC_TOGGLE, button_style);
-        let _ = button(parent, "Выход", 176, 252, 140, 32, IDC_EXIT, button_style);
+        let toggle = button(parent, "Пауза", 24, 296, 140, 32, IDC_TOGGLE, button_style);
+        let _ = button(parent, "Выход", 176, 296, 140, 32, IDC_EXIT, button_style);
+        super::ui().link = github_link(parent).unwrap_or(HWND(std::ptr::null_mut()));
         let mut ui = super::ui();
         ui.status = status.unwrap_or(HWND(std::ptr::null_mut()));
         ui.toggle = toggle.unwrap_or(HWND(std::ptr::null_mut()));
@@ -248,6 +271,66 @@ unsafe fn static_text(
         None,
         None,
     )
+}
+
+unsafe fn github_link(parent: HWND) -> Result<HWND, windows::core::Error> {
+    let mut rect = RECT::default();
+    let _ = GetClientRect(parent, &mut rect);
+    let y = (rect.bottom - 40).max(0);
+    let wide = utf16(REPO);
+    let link = CreateWindowExW(
+        WINDOW_EX_STYLE::default(),
+        w!("STATIC"),
+        windows::core::PCWSTR(wide.as_ptr()),
+        WS_CHILD | WS_VISIBLE | WINDOW_STYLE(SS_NOTIFY),
+        24,
+        y,
+        (rect.right - 48).max(200),
+        24,
+        Some(parent),
+        Some(HMENU(IDC_LINK as usize as *mut core::ffi::c_void)),
+        None,
+        None,
+    )?;
+    let font = CreateFontW(
+        -16,
+        0,
+        0,
+        0,
+        FW_NORMAL.0 as i32,
+        0,
+        1,
+        0,
+        DEFAULT_CHARSET,
+        OUT_DEFAULT_PRECIS,
+        CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY,
+        DEFAULT_PITCH.0 as u32,
+        w!("Segoe UI"),
+    );
+    if !font.0.is_null() {
+        let _ = SendMessageW(
+            link,
+            WM_SETFONT,
+            Some(WPARAM(font.0 as usize)),
+            Some(LPARAM(1)),
+        );
+    }
+    Ok(link)
+}
+
+fn open_repo() {
+    let wide = utf16(REPO);
+    unsafe {
+        let _ = ShellExecuteW(
+            None,
+            w!("open"),
+            windows::core::PCWSTR(wide.as_ptr()),
+            windows::core::PCWSTR::null(),
+            windows::core::PCWSTR::null(),
+            SW_SHOWNORMAL,
+        );
+    }
 }
 
 unsafe fn button(
@@ -318,7 +401,7 @@ fn show_menu(hwnd: HWND) {
 
 fn add_tray(hwnd: HWND, icon: HICON) -> Result<(), String> {
     let mut tip = [0u16; 128];
-    for (i, unit) in "Зябра — переключатель раскладки"
+    for (i, unit) in concat!("Зябра ", env!("CARGO_PKG_VERSION"), " — переключатель раскладки")
         .encode_utf16()
         .take(127)
         .enumerate()

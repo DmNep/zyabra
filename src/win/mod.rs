@@ -32,6 +32,7 @@ struct UiState {
     window: HWND,
     status: HWND,
     toggle: HWND,
+    link: HWND,
     icon: windows::Win32::UI::WindowsAndMessaging::HICON,
 }
 
@@ -48,6 +49,7 @@ static UI: Mutex<UiState> = Mutex::new(UiState {
     window: HWND(std::ptr::null_mut()),
     status: HWND(std::ptr::null_mut()),
     toggle: HWND(std::ptr::null_mut()),
+    link: HWND(std::ptr::null_mut()),
     icon: windows::Win32::UI::WindowsAndMessaging::HICON(std::ptr::null_mut()),
 });
 
