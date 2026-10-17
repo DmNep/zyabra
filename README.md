@@ -4,6 +4,8 @@
 
 `ghbdtn` становится `привет`, `руддщ` становится `hello`.
 
+Скачать: [последний релиз](https://github.com/DmNep/zyabra/releases/latest) ([zyabra.exe](https://github.com/DmNep/zyabra/releases/latest/download/zyabra.exe)).
+
 ## Что программа не делает
 
 - Не пишет набранный текст на диск и не ведёт журнал клавиш.
