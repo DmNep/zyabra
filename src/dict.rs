@@ -1,0 +1,90 @@
+use crate::keymap::Script;
+
+pub trait HasWords {
+    fn has(&self, script: Script, normalized: &str) -> bool;
+}
+
+pub struct MapDict {
+    en: Vec<String>,
+    ru: Vec<String>,
+}
+
+impl MapDict {
+    pub fn new(en: &[&str], ru: &[&str]) -> Self {
+        Self {
+            en: prepare(en),
+            ru: prepare(ru),
+        }
+    }
+}
+
+impl HasWords for MapDict {
+    fn has(&self, script: Script, normalized: &str) -> bool {
+        let list = match script {
+            Script::En => &self.en,
+            Script::Ru => &self.ru,
+        };
+        list.binary_search_by(|item| item.as_str().cmp(normalized))
+            .is_ok()
+    }
+}
+
+pub struct StaticDict {
+    en: Vec<&'static str>,
+    ru: Vec<&'static str>,
+}
+
+impl StaticDict {
+    pub fn load() -> Self {
+        let mut en = collect(include_str!("../dictionaries/en.txt"), is_en_word);
+        let mut ru = collect(include_str!("../dictionaries/ru.txt"), is_ru_word);
+        en.sort_unstable();
+        en.dedup();
+        ru.sort_unstable();
+        ru.dedup();
+        Self { en, ru }
+    }
+}
+
+impl HasWords for StaticDict {
+    fn has(&self, script: Script, normalized: &str) -> bool {
+        let list: &[&str] = match script {
+            Script::En => &self.en,
+            Script::Ru => &self.ru,
+        };
+        list.binary_search(&normalized).is_ok()
+    }
+}
+
+fn prepare(words: &[&str]) -> Vec<String> {
+    let mut out: Vec<String> = words.iter().map(|word| normalize(word)).collect();
+    out.sort();
+    out.dedup();
+    out
+}
+
+fn collect(text: &'static str, keep: fn(&str) -> bool) -> Vec<&'static str> {
+    text.lines()
+        .map(str::trim)
+        .filter(|word| keep(word))
+        .collect()
+}
+
+fn is_en_word(word: &str) -> bool {
+    (2..=20).contains(&word.len()) && word.bytes().all(|b| b.is_ascii_lowercase())
+}
+
+fn is_ru_word(word: &str) -> bool {
+    let len = word.chars().count();
+    (2..=20).contains(&len) && word.chars().all(|ch| ('а'..='я').contains(&ch))
+}
+
+pub fn normalize(word: &str) -> String {
+    let mut out = String::with_capacity(word.len());
+    for ch in word.chars() {
+        for lower in ch.to_lowercase() {
+            out.push(if lower == 'ё' { 'е' } else { lower });
+        }
+    }
+    out
+}

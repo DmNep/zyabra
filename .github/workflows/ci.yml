@@ -1,0 +1,25 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test
+
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse network APIs in the program
+        shell: bash
+        run: |
+          if grep -RInE 'TcpStream|UdpSocket|reqwest|hyper::|WinHttp|InternetOpen|HttpClient' src Cargo.toml; then
+            echo "network API is not allowed"
+            exit 1
+          fi
