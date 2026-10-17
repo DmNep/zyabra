@@ -30,8 +30,13 @@ struct Runtime {
 
 struct UiState {
     window: HWND,
+    intro: HWND,
+    explain: HWND,
+    safety_title: HWND,
+    safety: HWND,
     status: HWND,
     toggle: HWND,
+    quit: HWND,
     link: HWND,
     icon: windows::Win32::UI::WindowsAndMessaging::HICON,
 }
@@ -47,8 +52,13 @@ static RUNTIME: Mutex<Runtime> = Mutex::new(Runtime {
 
 static UI: Mutex<UiState> = Mutex::new(UiState {
     window: HWND(std::ptr::null_mut()),
+    intro: HWND(std::ptr::null_mut()),
+    explain: HWND(std::ptr::null_mut()),
+    safety_title: HWND(std::ptr::null_mut()),
+    safety: HWND(std::ptr::null_mut()),
     status: HWND(std::ptr::null_mut()),
     toggle: HWND(std::ptr::null_mut()),
+    quit: HWND(std::ptr::null_mut()),
     link: HWND(std::ptr::null_mut()),
     icon: windows::Win32::UI::WindowsAndMessaging::HICON(std::ptr::null_mut()),
 });

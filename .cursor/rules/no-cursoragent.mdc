@@ -1,0 +1,14 @@
+---
+description: Не оставлять cursoragent соавтором коммитов
+alwaysApply: true
+---
+
+# Без cursoragent
+
+Dm запретил показывать cursoragent / Cursor Agent в соавторах и contributors на GitHub.
+
+Не оставляй в сообщении коммита строку `Co-authored-by: Cursor <cursoragent@cursor.com>`. Не прячь её через `.mailmap`: GitHub всё равно показывает Co-authored-by.
+
+`git commit` в среде Cursor сам дописывает этот trailer. После коммита проверь `git log -1 --format=%B`. Если строка есть, не пушь коммит. Для ещё не опубликованного коммита собери замену через `git commit-tree` с тем же деревом, автором, датой и родителем, без этой строки, и переставь ветку на новый хеш.
+
+Если строка уже есть в опубликованной истории, cursoragent исчезнет только после переписывания всех достижимых коммитов ветки по умолчанию и тегов. Это force-push в main. Не делай его, пока Dm отдельно не разрешил force-push в main.

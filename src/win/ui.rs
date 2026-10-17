@@ -14,13 +14,15 @@ use windows::Win32::UI::Shell::{
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyIcon, DestroyMenu,
     DestroyWindow, DispatchMessageW, GetCursorPos, GetMessageW, LoadCursorW, LoadIconW,
-    GetClientRect, PostMessageW, PostQuitMessage, RegisterClassExW, SendMessageW,
+    GetClientRect, MoveWindow, PostMessageW, PostQuitMessage, RegisterClassExW, SendMessageW,
     SetForegroundWindow, SetWindowTextW, ShowWindow, TrackPopupMenuEx, TranslateMessage,
-    CS_HREDRAW, CS_VREDRAW, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, MF_STRING, MSG, SW_RESTORE,
-    SW_SHOWNORMAL, TPM_BOTTOMALIGN, TPM_RIGHTALIGN, WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLOSE,
-    WM_COMMAND, WM_CREATE, WM_CTLCOLORSTATIC, WM_DESTROY, WM_LBUTTONUP, WM_NULL, WM_RBUTTONUP,
-    WM_SETFONT, WNDCLASSEXW, WS_CAPTION, WS_CHILD, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU,
-    WS_VISIBLE,
+    CS_HREDRAW, CS_VREDRAW, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, MF_STRING, MINMAXINFO, MSG,
+    SC_MINIMIZE, SW_HIDE, SW_SHOW, SW_SHOWNORMAL, TPM_BOTTOMALIGN, TPM_RIGHTALIGN,
+    WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_CTLCOLORSTATIC, WM_DESTROY,
+    WM_GETMINMAXINFO, WM_LBUTTONDBLCLK, WM_LBUTTONUP, WM_NULL, WM_RBUTTONUP, WM_SETFONT, WM_SIZE,
+    WM_SYSCOMMAND,
+    WNDCLASSEXW, WS_CAPTION, WS_CHILD, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU,
+    WS_THICKFRAME, WS_VISIBLE,
 };
 
 use super::{set_enabled, utf16};
@@ -68,7 +70,7 @@ pub(super) fn run_window() -> Result<(), String> {
             WINDOW_EX_STYLE::default(),
             CLASS,
             windows::core::PCWSTR(title.as_ptr()),
-            WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE,
+            WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME,
             120,
             80,
             540,
@@ -100,7 +102,7 @@ fn focus_existing() -> bool {
     unsafe {
         match windows::Win32::UI::WindowsAndMessaging::FindWindowW(CLASS, None) {
             Ok(hwnd) if !hwnd.0.is_null() => {
-                let _ = ShowWindow(hwnd, SW_RESTORE);
+                let _ = ShowWindow(hwnd, SW_SHOW);
                 let _ = SetForegroundWindow(hwnd);
                 true
             }
@@ -111,8 +113,11 @@ fn focus_existing() -> bool {
 
 pub(super) fn refresh_status() {
     let enabled = super::is_enabled();
-    let ui = super::ui();
-    if ui.status.0.is_null() {
+    let (status_hwnd, toggle_hwnd) = {
+        let ui = super::ui();
+        (ui.status, ui.toggle)
+    };
+    if status_hwnd.0.is_null() {
         return;
     }
     let status = if enabled {
@@ -120,16 +125,12 @@ pub(super) fn refresh_status() {
     } else {
         "На паузе. Клавиши не обрабатываются."
     };
-    let button = if enabled {
-        "Пауза"
-    } else {
-        "Продолжить"
-    };
+    let button = if enabled { "Пауза" } else { "Продолжить" };
     let status = utf16(status);
     let button = utf16(button);
     unsafe {
-        let _ = SetWindowTextW(ui.status, windows::core::PCWSTR(status.as_ptr()));
-        let _ = SetWindowTextW(ui.toggle, windows::core::PCWSTR(button.as_ptr()));
+        let _ = SetWindowTextW(status_hwnd, windows::core::PCWSTR(status.as_ptr()));
+        let _ = SetWindowTextW(toggle_hwnd, windows::core::PCWSTR(button.as_ptr()));
     }
 }
 
@@ -144,9 +145,20 @@ unsafe extern "system" fn wnd_proc(
             create_children(hwnd);
             LRESULT(0)
         }
+        WM_SIZE => {
+            layout(hwnd);
+            LRESULT(0)
+        }
+        WM_GETMINMAXINFO => {
+            let info = &mut *(lparam.0 as *mut MINMAXINFO);
+            info.ptMinTrackSize.x = 460;
+            info.ptMinTrackSize.y = 420;
+            LRESULT(0)
+        }
         WM_CTLCOLORSTATIC => {
             let child = HWND(lparam.0 as *mut core::ffi::c_void);
-            if child == super::ui().link {
+            let link = super::ui().link;
+            if !link.0.is_null() && child == link {
                 let dc = HDC(wparam.0 as *mut core::ffi::c_void);
                 let _ = SetTextColor(dc, COLORREF(0x00C0_6000));
                 let _ = SetBkMode(dc, TRANSPARENT);
@@ -170,8 +182,8 @@ unsafe extern "system" fn wnd_proc(
         }
         WM_TRAY => {
             match lparam.0 as u32 {
-                WM_LBUTTONUP => {
-                    let _ = ShowWindow(hwnd, SW_RESTORE);
+                WM_LBUTTONUP | WM_LBUTTONDBLCLK => {
+                    let _ = ShowWindow(hwnd, SW_SHOW);
                     let _ = SetForegroundWindow(hwnd);
                 }
                 WM_RBUTTONUP => show_menu(hwnd),
@@ -179,8 +191,16 @@ unsafe extern "system" fn wnd_proc(
             }
             LRESULT(0)
         }
+        WM_SYSCOMMAND => {
+            if (wparam.0 & 0xFFF0) as u32 == SC_MINIMIZE {
+                hide_to_tray(hwnd);
+                LRESULT(0)
+            } else {
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+        }
         WM_CLOSE => {
-            let _ = DestroyWindow(hwnd);
+            hide_to_tray(hwnd);
             LRESULT(0)
         }
         WM_DESTROY => {
@@ -201,16 +221,8 @@ fn create_children(parent: HWND) {
     let text_style = WS_CHILD | WS_VISIBLE;
     let button_style = WS_CHILD | WS_VISIBLE;
     unsafe {
-        let _ = static_text(
-            parent,
-            "Pause - исправить текущее слово.",
-            24,
-            16,
-            480,
-            28,
-            text_style,
-        );
-        let _ = static_text(
+        let intro = static_text(parent, "Pause - исправить текущее слово.", 24, 16, 480, 28, text_style);
+        let explain = static_text(
             parent,
             "Если слово набрано не в той раскладке, Зябра стирает его и пишет заново в правильной, затем переключает раскладку.",
             24,
@@ -219,8 +231,8 @@ fn create_children(parent: HWND) {
             64,
             text_style,
         );
-        let _ = static_text(parent, "Безопасность:", 24, 120, 480, 24, text_style);
-        let _ = static_text(
+        let safety_title = static_text(parent, "Безопасность:", 24, 120, 480, 24, text_style);
+        let safety = static_text(
             parent,
             "В памяти только текущее слово и одна последняя замена. На диск набранное не пишется. В интернет программа не ходит: словарь уже внутри файла. Поля пароля не читаются. «Пауза» останавливает обработку.",
             24,
@@ -239,11 +251,65 @@ fn create_children(parent: HWND) {
             text_style,
         );
         let toggle = button(parent, "Пауза", 24, 296, 140, 32, IDC_TOGGLE, button_style);
-        let _ = button(parent, "Выход", 176, 296, 140, 32, IDC_EXIT, button_style);
-        super::ui().link = github_link(parent).unwrap_or(HWND(std::ptr::null_mut()));
+        let quit = button(parent, "Выход", 176, 296, 140, 32, IDC_EXIT, button_style);
+        let link = github_link(parent);
         let mut ui = super::ui();
+        ui.intro = intro.unwrap_or(HWND(std::ptr::null_mut()));
+        ui.explain = explain.unwrap_or(HWND(std::ptr::null_mut()));
+        ui.safety_title = safety_title.unwrap_or(HWND(std::ptr::null_mut()));
+        ui.safety = safety.unwrap_or(HWND(std::ptr::null_mut()));
         ui.status = status.unwrap_or(HWND(std::ptr::null_mut()));
         ui.toggle = toggle.unwrap_or(HWND(std::ptr::null_mut()));
+        ui.quit = quit.unwrap_or(HWND(std::ptr::null_mut()));
+        ui.link = link.unwrap_or(HWND(std::ptr::null_mut()));
+    }
+    layout(parent);
+}
+
+fn layout(parent: HWND) {
+    let handles = {
+        let ui = super::ui();
+        (
+            ui.intro,
+            ui.explain,
+            ui.safety_title,
+            ui.safety,
+            ui.status,
+            ui.toggle,
+            ui.quit,
+            ui.link,
+        )
+    };
+    let mut rect = RECT::default();
+    unsafe {
+        if GetClientRect(parent, &mut rect).is_err() || rect.bottom < 80 {
+            return;
+        }
+        let width = (rect.right - 48).max(120);
+        let link_y = rect.bottom - 36;
+        let buttons_y = link_y - 48;
+        let status_y = buttons_y - 36;
+        place(handles.0, 24, 16, width, 28);
+        place(handles.1, 24, 48, width, 64);
+        place(handles.2, 24, 120, width, 24);
+        place(handles.3, 24, 148, width, 96);
+        place(handles.4, 24, status_y, width, 28);
+        place(handles.5, 24, buttons_y, 140, 32);
+        place(handles.6, 176, buttons_y, 140, 32);
+        place(handles.7, 24, link_y, width, 24);
+    }
+}
+
+unsafe fn place(hwnd: HWND, x: i32, y: i32, w: i32, h: i32) {
+    if hwnd.0.is_null() {
+        return;
+    }
+    let _ = MoveWindow(hwnd, x, y, w, h, true);
+}
+
+fn hide_to_tray(hwnd: HWND) {
+    unsafe {
+        let _ = ShowWindow(hwnd, SW_HIDE);
     }
 }
 
