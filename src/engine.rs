@@ -25,7 +25,8 @@ struct Saved {
 pub struct Engine {
     buf: Vec<char>,
     overflow: bool,
-    /// The single previous replacement, so Pause can undo it.
+    /// The word currently on screen after the last Pause or autocorrect,
+    /// paired with its other-layout form. Each Pause swaps them.
     /// Cleared on pause, navigation, password fields, and the next word.
     last: Option<Saved>,
 }
@@ -99,8 +100,8 @@ impl Engine {
         Some(rewrite)
     }
 
-    /// Pause: convert the unfinished word, or undo the last replacement
-    /// when the buffer is empty.
+    /// Pause: convert the unfinished word, or swap the last replacement
+    /// again when the buffer is empty. Repeated presses keep swapping.
     pub fn force(&mut self) -> Option<Rewrite> {
         if self.buf.is_empty() || self.overflow {
             self.overflow = false;
@@ -128,12 +129,19 @@ impl Engine {
     fn undo(&mut self) -> Option<Rewrite> {
         let saved = self.last.take()?;
         let term_len = usize::from(saved.term.is_some());
-        Some(Rewrite {
+        let rewrite = Rewrite {
             delete: saved.inserted.chars().count() + term_len,
-            insert: saved.original,
+            insert: saved.original.clone(),
             switch_to: saved.switched_to.other(),
             term: saved.term,
-        })
+        };
+        self.last = Some(Saved {
+            original: saved.inserted,
+            inserted: saved.original,
+            switched_to: rewrite.switch_to,
+            term: saved.term,
+        });
+        Some(rewrite)
     }
 }
 
@@ -168,7 +176,35 @@ mod tests {
         assert_eq!(undo.insert, "ghbdtn");
         assert_eq!(undo.switch_to, Script::En);
         assert_eq!(undo.term, Some(Term::Space));
-        assert!(engine.force().is_none());
+
+        let again = engine.force().unwrap();
+        assert_eq!(again.delete, 7);
+        assert_eq!(again.insert, "привет");
+        assert_eq!(again.switch_to, Script::Ru);
+        assert_eq!(again.term, Some(Term::Space));
+
+        let back = engine.force().unwrap();
+        assert_eq!(back.insert, "ghbdtn");
+        assert_eq!(back.switch_to, Script::En);
+    }
+
+    #[test]
+    fn pause_toggles_the_same_word() {
+        let mut engine = Engine::new();
+        type_word(&mut engine, "ghbdtn");
+        let first = engine.force().unwrap();
+        assert_eq!(first.insert, "привет");
+        assert_eq!(first.switch_to, Script::Ru);
+        assert_eq!(first.term, None);
+
+        let second = engine.force().unwrap();
+        assert_eq!(second.delete, "привет".chars().count());
+        assert_eq!(second.insert, "ghbdtn");
+        assert_eq!(second.switch_to, Script::En);
+
+        let third = engine.force().unwrap();
+        assert_eq!(third.insert, "привет");
+        assert_eq!(third.switch_to, Script::Ru);
     }
 
     #[test]
