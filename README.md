@@ -4,7 +4,7 @@
 
 `ghbdtn` становится `привет`, `руддщ` становится `hello`.
 
-Скачать: [последний релиз](https://github.com/DmNep/zyabra/releases/latest) ([zyabra-0.1.3.exe](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.3.exe)).
+Скачать: [последний релиз](https://github.com/DmNep/zyabra/releases/latest) ([zyabra-0.1.4.exe](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.4.exe)).
 
 ## Что программа не делает
 
@@ -54,7 +54,7 @@ cargo test
 cargo build --release
 ```
 
-Готовый файл: `target/release/zyabra.exe`. В релизе он называется `zyabra-0.1.3.exe`: версия стоит после названия. Подпись кода нет, SmartScreen может спросить подтверждение при первом запуске.
+Готовый файл: `target/release/zyabra.exe`. В релизе он называется `zyabra-0.1.4.exe`: версия стоит после названия. Подпись кода нет, SmartScreen может спросить подтверждение при первом запуске.
 
 ## Словари
 

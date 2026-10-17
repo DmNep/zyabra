@@ -39,6 +39,8 @@ struct UiState {
     quit: HWND,
     link: HWND,
     icon: windows::Win32::UI::WindowsAndMessaging::HICON,
+    font: windows::Win32::Graphics::Gdi::HFONT,
+    link_font: windows::Win32::Graphics::Gdi::HFONT,
 }
 
 // Window handles are process-wide. `Send` lets the UI state live in a mutex.
@@ -61,6 +63,8 @@ static UI: Mutex<UiState> = Mutex::new(UiState {
     quit: HWND(std::ptr::null_mut()),
     link: HWND(std::ptr::null_mut()),
     icon: windows::Win32::UI::WindowsAndMessaging::HICON(std::ptr::null_mut()),
+    font: windows::Win32::Graphics::Gdi::HFONT(std::ptr::null_mut()),
+    link_font: windows::Win32::Graphics::Gdi::HFONT(std::ptr::null_mut()),
 });
 
 static DICT: OnceLock<StaticDict> = OnceLock::new();

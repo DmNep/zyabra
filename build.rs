@@ -5,6 +5,7 @@ use std::path::PathBuf;
 fn main() {
     println!("cargo:rerun-if-changed=dictionaries/en.txt");
     println!("cargo:rerun-if-changed=dictionaries/ru.txt");
+    println!("cargo:rerun-if-changed=assets/zyabra.ico");
     let out = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"));
     gzip("dictionaries/en.txt", &out.join("en.txt.gz"));
     gzip("dictionaries/ru.txt", &out.join("ru.txt.gz"));
@@ -22,8 +23,11 @@ fn embed_version(out: &std::path::Path) {
     let patch = parts.next().unwrap_or("0");
     let rc_path = out.join("zyabra.rc");
     let obj_path = out.join("zyabra-version.o");
+    std::fs::copy("assets/zyabra.ico", out.join("zyabra.ico"))
+        .unwrap_or_else(|err| panic!("copy icon: {err}"));
     let text = format!(
         r#"#pragma code_page(65001)
+1 ICON "zyabra.ico"
 1 VERSIONINFO
 FILEVERSION {major},{minor},{patch},0
 PRODUCTVERSION {major},{minor},{patch},0

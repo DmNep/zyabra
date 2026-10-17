@@ -1,10 +1,10 @@
 use windows::core::w;
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    CreateBitmap, CreateDIBSection, CreateFontW, DeleteObject, GetDC, ReleaseDC, SetBkMode,
-    SetTextColor, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, CLEARTYPE_QUALITY, CLIP_DEFAULT_PRECIS,
-    COLOR_WINDOW, DEFAULT_CHARSET, DEFAULT_PITCH, DIB_RGB_COLORS, FW_NORMAL, HBITMAP, HBRUSH,
-    HDC, OUT_DEFAULT_PRECIS, TRANSPARENT,
+    CreateBitmap, CreateDIBSection, CreateFontW, DeleteObject, GetDC, GetDeviceCaps, ReleaseDC,
+    SetBkMode, SetTextColor, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, CLEARTYPE_QUALITY,
+    CLIP_DEFAULT_PRECIS, COLOR_BTNFACE, DEFAULT_CHARSET, DEFAULT_PITCH, DIB_RGB_COLORS, FW_NORMAL,
+    HBITMAP, HBRUSH, HDC, HFONT, LOGPIXELSY, OUT_DEFAULT_PRECIS, TRANSPARENT,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Shell::{
@@ -12,17 +12,17 @@ use windows::Win32::UI::Shell::{
     NOTIFYICONDATAW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyIcon, DestroyMenu,
+    AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu,
     DestroyWindow, DispatchMessageW, GetCursorPos, GetMessageW, LoadCursorW, LoadIconW,
-    GetClientRect, MoveWindow, PostMessageW, PostQuitMessage, RegisterClassExW, SendMessageW,
-    SetForegroundWindow, SetWindowTextW, ShowWindow, TrackPopupMenuEx, TranslateMessage,
-    CS_HREDRAW, CS_VREDRAW, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, MF_STRING, MINMAXINFO, MSG,
-    SC_MINIMIZE, SW_HIDE, SW_SHOW, SW_SHOWNORMAL, TPM_BOTTOMALIGN, TPM_RIGHTALIGN,
-    WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_CTLCOLORSTATIC, WM_DESTROY,
-    WM_GETMINMAXINFO, WM_LBUTTONDBLCLK, WM_LBUTTONUP, WM_NULL, WM_RBUTTONUP, WM_SETFONT, WM_SIZE,
-    WM_SYSCOMMAND,
-    WNDCLASSEXW, WS_CAPTION, WS_CHILD, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU,
-    WS_THICKFRAME, WS_VISIBLE,
+    GetClientRect, GetSystemMetrics, MoveWindow, PostMessageW, PostQuitMessage, RegisterClassExW,
+    SendMessageW, SetForegroundWindow, SetWindowTextW, ShowWindow, TrackPopupMenuEx,
+    TranslateMessage, CS_HREDRAW, CS_VREDRAW, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, MF_STRING,
+    MINMAXINFO, MSG, SC_MINIMIZE, SM_CXSCREEN, SM_CYSCREEN, SW_HIDE, SW_SHOW, SW_SHOWNORMAL,
+    TPM_BOTTOMALIGN, TPM_RIGHTALIGN, WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLOSE, WM_COMMAND,
+    WM_CREATE, WM_CTLCOLORSTATIC, WM_DESTROY, WM_GETMINMAXINFO, WM_LBUTTONDBLCLK, WM_LBUTTONUP,
+    WM_NULL, WM_RBUTTONUP, WM_SETFONT, WM_SIZE, WM_SYSCOMMAND, WNDCLASSEXW, WS_CAPTION, WS_CHILD,
+    WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP, WS_THICKFRAME,
+    WS_VISIBLE,
 };
 
 use super::{set_enabled, utf16};
@@ -46,7 +46,7 @@ pub(super) fn run_window() -> Result<(), String> {
         }
         let instance = GetModuleHandleW(None).map_err(|err| err.to_string())?;
         let instance = windows::Win32::Foundation::HINSTANCE(instance.0);
-        let icon = make_icon();
+        let icon = load_icon(instance);
         super::ui().icon = icon;
 
         let class = WNDCLASSEXW {
@@ -56,7 +56,7 @@ pub(super) fn run_window() -> Result<(), String> {
             hInstance: instance,
             hIcon: icon,
             hCursor: LoadCursorW(None, IDC_ARROW).map_err(|err| err.to_string())?,
-            hbrBackground: HBRUSH((COLOR_WINDOW.0 as isize + 1) as *mut core::ffi::c_void),
+            hbrBackground: HBRUSH((COLOR_BTNFACE.0 as isize + 1) as *mut core::ffi::c_void),
             lpszClassName: CLASS,
             hIconSm: icon,
             ..Default::default()
@@ -66,15 +66,19 @@ pub(super) fn run_window() -> Result<(), String> {
         }
 
         let title = utf16(TITLE);
+        let width = dip(440);
+        let height = dip(304);
+        let x = (GetSystemMetrics(SM_CXSCREEN) - width) / 2;
+        let y = (GetSystemMetrics(SM_CYSCREEN) - height) / 2;
         let hwnd = CreateWindowExW(
             WINDOW_EX_STYLE::default(),
             CLASS,
             windows::core::PCWSTR(title.as_ptr()),
             WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME,
-            120,
-            80,
-            540,
-            560,
+            x,
+            y,
+            width,
+            height,
             None,
             None,
             Some(instance),
@@ -151,21 +155,19 @@ unsafe extern "system" fn wnd_proc(
         }
         WM_GETMINMAXINFO => {
             let info = &mut *(lparam.0 as *mut MINMAXINFO);
-            info.ptMinTrackSize.x = 460;
-            info.ptMinTrackSize.y = 420;
+            info.ptMinTrackSize.x = dip(400);
+            info.ptMinTrackSize.y = dip(280);
             LRESULT(0)
         }
         WM_CTLCOLORSTATIC => {
             let child = HWND(lparam.0 as *mut core::ffi::c_void);
             let link = super::ui().link;
+            let dc = HDC(wparam.0 as *mut core::ffi::c_void);
+            let _ = SetBkMode(dc, TRANSPARENT);
             if !link.0.is_null() && child == link {
-                let dc = HDC(wparam.0 as *mut core::ffi::c_void);
                 let _ = SetTextColor(dc, COLORREF(0x00C0_6000));
-                let _ = SetBkMode(dc, TRANSPARENT);
-                LRESULT((COLOR_WINDOW.0 as isize) + 1)
-            } else {
-                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
+            LRESULT((COLOR_BTNFACE.0 as isize) + 1)
         }
         WM_COMMAND => {
             match (wparam.0 & 0xFFFF) as u16 {
@@ -206,9 +208,15 @@ unsafe extern "system" fn wnd_proc(
         WM_DESTROY => {
             remove_tray(hwnd);
             super::hook::uninstall();
-            let icon = super::ui().icon;
-            if !icon.0.is_null() {
-                let _ = DestroyIcon(icon);
+            let (font, link_font) = {
+                let ui = super::ui();
+                (ui.font, ui.link_font)
+            };
+            if !font.0.is_null() {
+                let _ = DeleteObject(font.into());
+            }
+            if !link_font.0.is_null() {
+                let _ = DeleteObject(link_font.into());
             }
             PostQuitMessage(0);
             LRESULT(0)
@@ -219,49 +227,67 @@ unsafe extern "system" fn wnd_proc(
 
 fn create_children(parent: HWND) {
     let text_style = WS_CHILD | WS_VISIBLE;
-    let button_style = WS_CHILD | WS_VISIBLE;
+    let button_style = WS_CHILD | WS_VISIBLE | WS_TABSTOP;
     unsafe {
-        let intro = static_text(parent, "Pause - исправить текущее слово.", 24, 16, 480, 28, text_style);
+        let intro = static_text(parent, "Pause - исправить текущее слово.", 0, 0, 10, 10, text_style);
         let explain = static_text(
             parent,
             "Если слово набрано не в той раскладке, Зябра стирает его и пишет заново в правильной, затем переключает раскладку.",
-            24,
-            48,
-            480,
-            64,
+            0,
+            0,
+            10,
+            10,
             text_style,
         );
-        let safety_title = static_text(parent, "Безопасность:", 24, 120, 480, 24, text_style);
+        let safety_title = static_text(parent, "Безопасность:", 0, 0, 10, 10, text_style);
         let safety = static_text(
             parent,
             "В памяти только текущее слово и одна последняя замена. На диск набранное не пишется. В интернет программа не ходит: словарь уже внутри файла. Поля пароля не читаются. «Пауза» останавливает обработку.",
-            24,
-            148,
-            480,
-            96,
+            0,
+            0,
+            10,
+            10,
             text_style,
         );
         let status = static_text(
             parent,
             "Включена. Набранное никуда не сохраняется.",
-            24,
-            256,
-            480,
-            28,
+            0,
+            0,
+            10,
+            10,
             text_style,
         );
-        let toggle = button(parent, "Пауза", 24, 296, 140, 32, IDC_TOGGLE, button_style);
-        let quit = button(parent, "Выход", 176, 296, 140, 32, IDC_EXIT, button_style);
+        let toggle = button(parent, "Пауза", 0, 0, 10, 10, IDC_TOGGLE, button_style);
+        let quit = button(parent, "Выход", 0, 0, 10, 10, IDC_EXIT, button_style);
         let link = github_link(parent);
+        let font = segoe(false);
+        let link_font = segoe(true);
+        let handles = [
+            intro.unwrap_or(HWND(std::ptr::null_mut())),
+            explain.unwrap_or(HWND(std::ptr::null_mut())),
+            safety_title.unwrap_or(HWND(std::ptr::null_mut())),
+            safety.unwrap_or(HWND(std::ptr::null_mut())),
+            status.unwrap_or(HWND(std::ptr::null_mut())),
+            toggle.unwrap_or(HWND(std::ptr::null_mut())),
+            quit.unwrap_or(HWND(std::ptr::null_mut())),
+        ];
+        for hwnd in handles {
+            use_font(hwnd, font);
+        }
+        let link = link.unwrap_or(HWND(std::ptr::null_mut()));
+        use_font(link, link_font);
         let mut ui = super::ui();
-        ui.intro = intro.unwrap_or(HWND(std::ptr::null_mut()));
-        ui.explain = explain.unwrap_or(HWND(std::ptr::null_mut()));
-        ui.safety_title = safety_title.unwrap_or(HWND(std::ptr::null_mut()));
-        ui.safety = safety.unwrap_or(HWND(std::ptr::null_mut()));
-        ui.status = status.unwrap_or(HWND(std::ptr::null_mut()));
-        ui.toggle = toggle.unwrap_or(HWND(std::ptr::null_mut()));
-        ui.quit = quit.unwrap_or(HWND(std::ptr::null_mut()));
-        ui.link = link.unwrap_or(HWND(std::ptr::null_mut()));
+        ui.intro = handles[0];
+        ui.explain = handles[1];
+        ui.safety_title = handles[2];
+        ui.safety = handles[3];
+        ui.status = handles[4];
+        ui.toggle = handles[5];
+        ui.quit = handles[6];
+        ui.link = link;
+        ui.font = font;
+        ui.link_font = link_font;
     }
     layout(parent);
 }
@@ -285,18 +311,33 @@ fn layout(parent: HWND) {
         if GetClientRect(parent, &mut rect).is_err() || rect.bottom < 80 {
             return;
         }
-        let width = (rect.right - 48).max(120);
-        let link_y = rect.bottom - 36;
-        let buttons_y = link_y - 48;
-        let status_y = buttons_y - 36;
-        place(handles.0, 24, 16, width, 28);
-        place(handles.1, 24, 48, width, 64);
-        place(handles.2, 24, 120, width, 24);
-        place(handles.3, 24, 148, width, 96);
-        place(handles.4, 24, status_y, width, 28);
-        place(handles.5, 24, buttons_y, 140, 32);
-        place(handles.6, 176, buttons_y, 140, 32);
-        place(handles.7, 24, link_y, width, 24);
+        let margin = dip(12);
+        let width = (rect.right - margin * 2).max(dip(160));
+        let line = dip(18);
+        let mut y = margin;
+        place(handles.0, margin, y, width, line);
+        y += line + dip(2);
+        let explain_h = dip(34);
+        place(handles.1, margin, y, width, explain_h);
+        y += explain_h + dip(8);
+        place(handles.2, margin, y, width, line);
+        y += line;
+        let safety_h = dip(68);
+        place(handles.3, margin, y, width, safety_h);
+        y += safety_h + dip(6);
+        place(handles.4, margin, y, width, line);
+
+        let btn_h = dip(23);
+        let btn_y = rect.bottom - margin - btn_h;
+        let quit_w = dip(76);
+        let toggle_w = dip(108);
+        let gap = dip(8);
+        let quit_x = rect.right - margin - quit_w;
+        let toggle_x = quit_x - gap - toggle_w;
+        place(handles.5, toggle_x, btn_y, toggle_w, btn_h);
+        place(handles.6, quit_x, btn_y, quit_w, btn_h);
+        let link_w = (toggle_x - margin - gap).max(dip(40));
+        place(handles.7, margin, btn_y + dip(2), link_w, line);
     }
 }
 
@@ -340,49 +381,83 @@ unsafe fn static_text(
 }
 
 unsafe fn github_link(parent: HWND) -> Result<HWND, windows::core::Error> {
-    let mut rect = RECT::default();
-    let _ = GetClientRect(parent, &mut rect);
-    let y = (rect.bottom - 40).max(0);
     let wide = utf16(REPO);
-    let link = CreateWindowExW(
+    CreateWindowExW(
         WINDOW_EX_STYLE::default(),
         w!("STATIC"),
         windows::core::PCWSTR(wide.as_ptr()),
         WS_CHILD | WS_VISIBLE | WINDOW_STYLE(SS_NOTIFY),
-        24,
-        y,
-        (rect.right - 48).max(200),
-        24,
+        0,
+        0,
+        10,
+        10,
         Some(parent),
         Some(HMENU(IDC_LINK as usize as *mut core::ffi::c_void)),
         None,
         None,
-    )?;
-    let font = CreateFontW(
-        -16,
-        0,
-        0,
-        0,
-        FW_NORMAL.0 as i32,
-        0,
-        1,
-        0,
-        DEFAULT_CHARSET,
-        OUT_DEFAULT_PRECIS,
-        CLIP_DEFAULT_PRECIS,
-        CLEARTYPE_QUALITY,
-        DEFAULT_PITCH.0 as u32,
-        w!("Segoe UI"),
-    );
-    if !font.0.is_null() {
+    )
+}
+
+fn dip(px: i32) -> i32 {
+    px * system_dpi() / 96
+}
+
+fn system_dpi() -> i32 {
+    unsafe {
+        let dc = GetDC(None);
+        if dc.0.is_null() {
+            return 96;
+        }
+        let dpi = GetDeviceCaps(Some(dc), LOGPIXELSY);
+        let _ = ReleaseDC(None, dc);
+        if dpi <= 0 { 96 } else { dpi }
+    }
+}
+
+fn segoe(underline: bool) -> HFONT {
+    unsafe {
+        CreateFontW(
+            -(dip(12).max(11)),
+            0,
+            0,
+            0,
+            FW_NORMAL.0 as i32,
+            0,
+            u32::from(underline),
+            0,
+            DEFAULT_CHARSET,
+            OUT_DEFAULT_PRECIS,
+            CLIP_DEFAULT_PRECIS,
+            CLEARTYPE_QUALITY,
+            DEFAULT_PITCH.0 as u32,
+            w!("Segoe UI"),
+        )
+    }
+}
+
+fn use_font(hwnd: HWND, font: HFONT) {
+    if hwnd.0.is_null() || font.0.is_null() {
+        return;
+    }
+    unsafe {
         let _ = SendMessageW(
-            link,
+            hwnd,
             WM_SETFONT,
             Some(WPARAM(font.0 as usize)),
-            Some(LPARAM(1)),
+            Some(LPARAM(0)),
         );
     }
-    Ok(link)
+}
+
+fn load_icon(instance: windows::Win32::Foundation::HINSTANCE) -> HICON {
+    unsafe {
+        if let Ok(icon) = LoadIconW(Some(instance), windows::core::PCWSTR(1 as *const u16)) {
+            if !icon.0.is_null() {
+                return icon;
+            }
+        }
+        make_icon()
+    }
 }
 
 fn open_repo() {
