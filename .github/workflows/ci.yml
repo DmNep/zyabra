@@ -19,7 +19,7 @@ jobs:
       - name: Refuse network APIs in the program
         shell: bash
         run: |
-          if grep -RInE 'TcpStream|UdpSocket|reqwest|hyper::|WinHttp|InternetOpen|HttpClient' src Cargo.toml; then
+          if grep -RInE 'TcpStream|UdpSocket|reqwest|hyper::|WinHttp|InternetOpen|HttpClient' src build.rs Cargo.toml; then
             echo "network API is not allowed"
             exit 1
           fi
