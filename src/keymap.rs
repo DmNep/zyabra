@@ -372,6 +372,62 @@ const NUMS: &[NumDef] = &[
     },
 ];
 
+/// A physical key and whether Shift must be held to produce a character.
+/// `code` is the AT set-1 scan code, which is also the Linux evdev key code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Chord {
+    pub code: u16,
+    pub shift: bool,
+}
+
+pub fn chord_for(script: Script, ch: char) -> Option<Chord> {
+    let lower = ch.to_lowercase().next()?;
+    let letter = ch.is_alphabetic();
+    for key in KEYS {
+        let (base, shifted) = match script {
+            Script::En => (key.en, key.en_shift),
+            Script::Ru => (key.ru, key.ru_shift),
+        };
+        if letter && base == lower {
+            return Some(Chord {
+                code: key.scan,
+                shift: ch.is_uppercase(),
+            });
+        }
+        if !letter && base == ch {
+            return Some(Chord {
+                code: key.scan,
+                shift: false,
+            });
+        }
+        if !letter && shifted == Some(ch) {
+            return Some(Chord {
+                code: key.scan,
+                shift: true,
+            });
+        }
+    }
+    for num in NUMS {
+        if num.plain == ch {
+            return Some(Chord {
+                code: num.scan,
+                shift: false,
+            });
+        }
+        let shifted = match script {
+            Script::En => num.en_shift,
+            Script::Ru => num.ru_shift,
+        };
+        if shifted == ch {
+            return Some(Chord {
+                code: num.scan,
+                shift: true,
+            });
+        }
+    }
+    None
+}
+
 pub fn classify(scan: u16, shift: bool, caps: bool, script: Script) -> KeyClass {
     let scan = scan & 0xFF;
     if let Some(def) = KEYS.iter().find(|k| k.scan == scan) {
@@ -565,5 +621,37 @@ mod tests {
             KeyClass::Glyph('ё')
         );
         assert_eq!(classify(0x00, false, false, Script::En), KeyClass::Other);
+    }
+
+    #[test]
+    fn chords_match_the_keymap() {
+        assert_eq!(
+            chord_for(Script::En, 'q'),
+            Some(Chord { code: 0x10, shift: false })
+        );
+        assert_eq!(
+            chord_for(Script::Ru, 'й'),
+            Some(Chord { code: 0x10, shift: false })
+        );
+        assert_eq!(
+            chord_for(Script::Ru, 'Й'),
+            Some(Chord { code: 0x10, shift: true })
+        );
+        assert_eq!(
+            chord_for(Script::En, ','),
+            Some(Chord { code: 0x33, shift: false })
+        );
+        assert_eq!(
+            chord_for(Script::Ru, 'б'),
+            Some(Chord { code: 0x33, shift: false })
+        );
+        let word = "привет";
+        for ch in word.chars() {
+            let chord = chord_for(Script::Ru, ch).unwrap();
+            assert_eq!(
+                classify(chord.code, chord.shift, false, Script::Ru),
+                KeyClass::Glyph(ch)
+            );
+        }
     }
 }

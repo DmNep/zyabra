@@ -1,6 +1,6 @@
 //! Core of Zyabra. This crate has no I/O: it does not read the keyboard,
-//! write files, or open sockets. The Windows program in `main.rs` feeds it
-//! one current word and applies the result.
+//! write files, or open sockets. The program in `main.rs` feeds it one
+//! current word and applies the result.
 
 #![forbid(unsafe_code)]
 
@@ -12,4 +12,4 @@ mod keymap;
 pub use decide::{autocorrect, force_convert, Change};
 pub use dict::{HasWords, MapDict, StaticDict};
 pub use engine::{Engine, Rewrite};
-pub use keymap::{classify, KeyClass, Script, Term};
+pub use keymap::{chord_for, classify, Chord, KeyClass, Script, Term};
