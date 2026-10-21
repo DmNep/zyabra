@@ -10,8 +10,9 @@ pub struct Rewrite {
     pub delete: usize,
     pub insert: String,
     pub switch_to: Script,
-    /// Replay this terminator after the inserted text, while the old layout
-    /// is still active. `None` for a manual conversion that had no terminator.
+    /// Terminator to type after the inserted text, already in `switch_to`.
+    /// A mark is the other layout's character of the same key (`&` → `?`).
+    /// `None` for a manual conversion that had no terminator.
     pub term: Option<Term>,
 }
 
@@ -19,7 +20,9 @@ struct Saved {
     original: String,
     inserted: String,
     switched_to: Script,
+    /// Mark as it was typed, in `term_script`. Space, Enter and Tab ignore it.
     term: Option<Term>,
+    term_script: Script,
 }
 
 pub struct Engine {
@@ -85,17 +88,19 @@ impl Engine {
             return None;
         }
         let change = autocorrect(&original, dict)?;
+        let typed_in = change.switch_to.other();
         let rewrite = Rewrite {
             delete: original.chars().count(),
             insert: change.text.clone(),
             switch_to: change.switch_to,
-            term: Some(term),
+            term: Some(present_term(term, typed_in, change.switch_to)),
         };
         self.last = Some(Saved {
             original,
             inserted: change.text,
             switched_to: change.switch_to,
             term: Some(term),
+            term_script: typed_in,
         });
         Some(rewrite)
     }
@@ -122,6 +127,7 @@ impl Engine {
             inserted: change.text,
             switched_to: change.switch_to,
             term: None,
+            term_script: change.switch_to,
         });
         Some(rewrite)
     }
@@ -129,19 +135,32 @@ impl Engine {
     fn undo(&mut self) -> Option<Rewrite> {
         let saved = self.last.take()?;
         let term_len = usize::from(saved.term.is_some());
+        let switch_to = saved.switched_to.other();
         let rewrite = Rewrite {
             delete: saved.inserted.chars().count() + term_len,
             insert: saved.original.clone(),
-            switch_to: saved.switched_to.other(),
-            term: saved.term,
+            switch_to,
+            term: saved
+                .term
+                .map(|term| present_term(term, saved.term_script, switch_to)),
         };
         self.last = Some(Saved {
             original: saved.inserted,
             inserted: saved.original,
             switched_to: rewrite.switch_to,
             term: saved.term,
+            term_script: saved.term_script,
         });
         Some(rewrite)
+    }
+}
+
+fn present_term(term: Term, typed_in: Script, switch_to: Script) -> Term {
+    match term {
+        Term::Mark(ch) if typed_in != switch_to => {
+            Term::Mark(crate::keymap::other_mark(typed_in, ch).unwrap_or(ch))
+        }
+        other => other,
     }
 }
 
@@ -186,6 +205,33 @@ mod tests {
         let back = engine.force().unwrap();
         assert_eq!(back.insert, "ghbdtn");
         assert_eq!(back.switch_to, Script::En);
+    }
+
+    #[test]
+    fn mark_follows_the_layout() {
+        let dict = dict();
+        let mut engine = Engine::new();
+        type_word(&mut engine, "руддщ");
+        let rewrite = engine.end_word(Term::Mark(','), &dict).unwrap();
+        assert_eq!(rewrite.insert, "hello");
+        assert_eq!(rewrite.switch_to, Script::En);
+        assert_eq!(rewrite.term, Some(Term::Mark('?')));
+
+        let undo = engine.force().unwrap();
+        assert_eq!(undo.insert, "руддщ");
+        assert_eq!(undo.switch_to, Script::Ru);
+        assert_eq!(undo.term, Some(Term::Mark(',')));
+
+        let again = engine.force().unwrap();
+        assert_eq!(again.insert, "hello");
+        assert_eq!(again.term, Some(Term::Mark('?')));
+
+        let mut engine = Engine::new();
+        type_word(&mut engine, "ghbdtn");
+        let rewrite = engine.end_word(Term::Mark('&'), &dict).unwrap();
+        assert_eq!(rewrite.insert, "привет");
+        assert_eq!(rewrite.switch_to, Script::Ru);
+        assert_eq!(rewrite.term, Some(Term::Mark('?')));
     }
 
     #[test]

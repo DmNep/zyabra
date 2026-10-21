@@ -136,12 +136,12 @@ fn on_key(app: &mut App, code: u16, value: i32) -> Result<(), String> {
             return Ok(());
         }
         app.pause_down = true;
-        let Some(old) = read_layout(app) else {
+        if read_layout(app).is_none() {
             app.engine.cancel();
             return Ok(());
-        };
+        }
         if let Some(rewrite) = app.engine.force() {
-            apply(app, rewrite, old)?;
+            apply(app, rewrite)?;
         }
         return Ok(());
     }
@@ -178,31 +178,30 @@ fn finish(app: &mut App, code: u16, value: i32, term: Term, old: Script) -> Resu
     let rewrite = app.engine.end_word(term, dict());
     if let Some(rewrite) = rewrite {
         app.swallowed.insert(code);
-        apply(app, rewrite, old)?;
+        apply(app, rewrite)?;
         Ok(())
     } else {
         app.keys.forward(code, value)
     }
 }
 
-fn apply(app: &mut App, rewrite: Rewrite, old: Script) -> Result<(), String> {
+fn apply(app: &mut App, rewrite: Rewrite) -> Result<(), String> {
     let held = app.keys.pause_mods()?;
-    let typed = type_rewrite(app, &rewrite, old);
+    let typed = type_rewrite(app, &rewrite);
     let resumed = app.keys.resume_mods(&held);
     typed.and(resumed)
 }
 
-fn type_rewrite(app: &mut App, rewrite: &Rewrite, old: Script) -> Result<(), String> {
+fn type_rewrite(app: &mut App, rewrite: &Rewrite) -> Result<(), String> {
     for _ in 0..rewrite.delete {
         app.keys.tap(KeyCode::KEY_BACKSPACE.0, false)?;
     }
     switch_to(app, rewrite.switch_to)?;
     type_text(&mut app.keys, rewrite.switch_to, &rewrite.insert)?;
     if let Some(term) = rewrite.term {
-        switch_to(app, old)?;
-        type_term(&mut app.keys, old, term)?;
+        type_term(&mut app.keys, rewrite.switch_to, term)?;
     }
-    switch_to(app, rewrite.switch_to)
+    Ok(())
 }
 
 fn switch_to(app: &mut App, script: Script) -> Result<(), String> {

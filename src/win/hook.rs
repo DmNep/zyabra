@@ -127,6 +127,12 @@ fn handle_key(vk: u32, scan: u16, is_up: bool) -> bool {
         return false;
     }
 
+    // `!` and `?` are typed with Shift. Shift itself is not a character, and
+    // dropping the word here would throw it away before the mark arrives.
+    if is_shift_or_caps(vk) {
+        return false;
+    }
+
     if is_chord(vk) {
         rt.engine.cancel();
         return false;
@@ -222,6 +228,10 @@ fn is_navigation(vk: u32) -> bool {
         VK_INSERT.0,
     ];
     NAV.contains(&(vk as u16)) || (0x70..=0x87).contains(&vk)
+}
+
+fn is_shift_or_caps(vk: u32) -> bool {
+    vk == VK_SHIFT.0 as u32 || vk == 0xA0 || vk == 0xA1 || vk == VK_CAPITAL.0 as u32
 }
 
 fn is_chord(vk: u32) -> bool {

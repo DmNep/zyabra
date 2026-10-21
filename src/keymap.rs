@@ -481,6 +481,16 @@ fn class_letter_key(def: &KeyDef, shift: bool, caps: bool, script: Script) -> Ke
     }
 }
 
+/// What `ch`, typed in `from`, becomes on the same key in the other layout.
+/// `!` stays `!`. A Russian comma (Shift+/) becomes `?`, and English `&` becomes `?`.
+pub fn other_mark(from: Script, ch: char) -> Option<char> {
+    let chord = chord_for(from, ch)?;
+    match classify(chord.code, chord.shift, false, from.other()) {
+        KeyClass::Glyph(out) | KeyClass::End(Term::Mark(out)) => Some(out),
+        KeyClass::End(_) | KeyClass::Other => None,
+    }
+}
+
 pub fn other_char(from: Script, ch: char) -> Option<char> {
     let lower = ch.to_lowercase().next()?;
     let upper = ch.is_uppercase();
@@ -563,6 +573,10 @@ mod tests {
         assert_eq!(transpose(Script::En, "[jhjij").as_deref(), Some("хорошо"));
         assert_eq!(transpose(Script::En, "Ghbdtn").as_deref(), Some("Привет"));
         assert_eq!(transpose(Script::Ru, "руддщ").as_deref(), Some("hello"));
+        assert_eq!(other_mark(Script::Ru, ','), Some('?'));
+        assert_eq!(other_mark(Script::En, '&'), Some('?'));
+        assert_eq!(other_mark(Script::En, '!'), Some('!'));
+        assert_eq!(other_mark(Script::Ru, '?'), Some('&'));
     }
 
     #[test]
