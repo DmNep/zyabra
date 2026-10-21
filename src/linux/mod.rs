@@ -159,14 +159,14 @@ fn on_key(app: &mut App, code: u16, value: i32) -> Result<(), String> {
         return app.keys.forward(code, value);
     };
     if let Some(term) = fixed_term(code) {
-        return finish(app, code, value, term, old);
+        return finish(app, code, value, term);
     }
     match zyabra::classify(code, app.keys.shift_down(), app.caps, old) {
         KeyClass::Glyph(ch) => {
             app.engine.push_glyph(ch);
             app.keys.forward(code, value)
         }
-        KeyClass::End(term) => finish(app, code, value, term, old),
+        KeyClass::End(term) => finish(app, code, value, term),
         KeyClass::Other => {
             app.engine.cancel();
             app.keys.forward(code, value)
@@ -174,7 +174,7 @@ fn on_key(app: &mut App, code: u16, value: i32) -> Result<(), String> {
     }
 }
 
-fn finish(app: &mut App, code: u16, value: i32, term: Term, old: Script) -> Result<(), String> {
+fn finish(app: &mut App, code: u16, value: i32, term: Term) -> Result<(), String> {
     let rewrite = app.engine.end_word(term, dict());
     if let Some(rewrite) = rewrite {
         app.swallowed.insert(code);
