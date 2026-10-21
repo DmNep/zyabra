@@ -12,8 +12,8 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     KLF_SUBSTITUTE_OK,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetForegroundWindow, GetWindowThreadProcessId, MessageBoxW, PostMessageW, MB_ICONERROR, MB_OK,
-    WM_INPUTLANGCHANGEREQUEST,
+    GetForegroundWindow, GetGUIThreadInfo, GetWindowThreadProcessId, MessageBoxW, PostMessageW,
+    GUITHREADINFO, MB_ICONERROR, MB_OK, WM_INPUTLANGCHANGEREQUEST,
 };
 
 use zyabra::{Engine, StaticDict};
@@ -104,13 +104,30 @@ pub(super) fn dict() -> &'static StaticDict {
 
 pub(super) fn foreground_script() -> Option<zyabra::Script> {
     unsafe {
-        let hwnd = GetForegroundWindow();
+        let hwnd = input_hwnd();
         if hwnd.0.is_null() {
             return None;
         }
         let thread = GetWindowThreadProcessId(hwnd, None);
         let hkl = GetKeyboardLayout(thread);
         script_from_hkl(hkl.0 as usize as u32)
+    }
+}
+
+/// Window whose thread interprets keystrokes.
+///
+/// WebView2 (Tauri, WinForms) keeps focus on a child whose thread is not the
+/// top-level window's thread. A layout change updates that child and leaves
+/// the top-level thread on the previous layout. Reading `GetForegroundWindow`
+/// then classifies English input as Russian, so the typed word is never rewritten.
+fn input_hwnd() -> HWND {
+    unsafe {
+        let mut info = GUITHREADINFO::default();
+        info.cbSize = std::mem::size_of::<GUITHREADINFO>() as u32;
+        if GetGUIThreadInfo(0, &mut info).is_ok() && !info.hwndFocus.0.is_null() {
+            return info.hwndFocus;
+        }
+        GetForegroundWindow()
     }
 }
 
@@ -132,7 +149,7 @@ pub(super) fn switch_layout(script: zyabra::Script) {
         let Ok(hkl) = LoadKeyboardLayoutW(id, flags) else {
             return;
         };
-        let hwnd = GetForegroundWindow();
+        let hwnd = input_hwnd();
         if hwnd.0.is_null() {
             return;
         }
