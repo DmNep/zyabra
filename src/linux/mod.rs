@@ -23,9 +23,17 @@ use input::{Incoming, Keys};
 use layout::Layout;
 use ui::{Display, UiEvent};
 
-pub fn run() -> Result<(), String> {
+pub fn run(force_key: Option<u32>) -> Result<(), String> {
+    let force_key = match force_key {
+        Some(code) if code > u32::from(u16::MAX) => {
+            return Err(format!("код клавиши {code} не помещается в evdev"));
+        }
+        Some(code) => Some(code as u16),
+        None => None,
+    };
     let lock = single_instance()?;
-    let display = ui::open()?;
+    let extra_key = force_key.and_then(force_key_label);
+    let display = ui::open(extra_key.as_deref())?;
     let layout = layout::detect(display.as_ref().map(|display| (display.conn(), display.root())))?;
     let keys = Keys::open()?;
     let caps = keys.caps_lit();
@@ -41,6 +49,7 @@ pub fn run() -> Result<(), String> {
         engine: Engine::new(),
         enabled: true,
         pause_down: false,
+        force_key,
         caps,
         swallowed: HashSet::new(),
         _lock: lock,
@@ -83,6 +92,7 @@ struct App {
     engine: Engine,
     enabled: bool,
     pause_down: bool,
+    force_key: Option<u16>,
     caps: bool,
     swallowed: HashSet<u16>,
     _lock: std::fs::File,
@@ -100,7 +110,7 @@ fn on_input(app: &mut App, incoming: Incoming) -> Result<(), String> {
 
 fn on_key(app: &mut App, code: u16, value: i32) -> Result<(), String> {
     if value == 0 {
-        if code == KeyCode::KEY_PAUSE.0 {
+        if is_force_key(app, code) {
             app.pause_down = false;
         }
         if app.swallowed.remove(&code) {
@@ -109,6 +119,21 @@ fn on_key(app: &mut App, code: u16, value: i32) -> Result<(), String> {
         return app.keys.forward(code, value);
     }
     if app.swallowed.contains(&code) {
+        return Ok(());
+    }
+    if app.enabled && !focus_is_ours(app) && is_force_key(app, code) {
+        app.swallowed.insert(code);
+        if value != 1 || app.pause_down {
+            return Ok(());
+        }
+        app.pause_down = true;
+        if read_layout(app).is_none() {
+            app.engine.cancel();
+            return Ok(());
+        }
+        if let Some(rewrite) = app.engine.force() {
+            apply(app, rewrite)?;
+        }
         return Ok(());
     }
     if code == KeyCode::KEY_CAPSLOCK.0 && value == 1 {
@@ -129,21 +154,6 @@ fn on_key(app: &mut App, code: u16, value: i32) -> Result<(), String> {
     if app.keys.chord_down() {
         app.engine.cancel();
         return app.keys.forward(code, value);
-    }
-    if code == KeyCode::KEY_PAUSE.0 {
-        app.swallowed.insert(code);
-        if value != 1 || app.pause_down {
-            return Ok(());
-        }
-        app.pause_down = true;
-        if read_layout(app).is_none() {
-            app.engine.cancel();
-            return Ok(());
-        }
-        if let Some(rewrite) = app.engine.force() {
-            apply(app, rewrite)?;
-        }
-        return Ok(());
     }
     if code == KeyCode::KEY_BACKSPACE.0 {
         app.engine.backspace();
@@ -171,6 +181,87 @@ fn on_key(app: &mut App, code: u16, value: i32) -> Result<(), String> {
             app.engine.cancel();
             app.keys.forward(code, value)
         }
+    }
+}
+
+fn is_force_key(app: &App, code: u16) -> bool {
+    code == KeyCode::KEY_PAUSE.0 || app.force_key == Some(code)
+}
+
+fn force_key_label(code: u16) -> Option<String> {
+    let name = match code {
+        1 => "Esc",
+        14 => "Backspace",
+        15 => "Tab",
+        16 => "Q",
+        17 => "W",
+        18 => "E",
+        19 => "R",
+        20 => "T",
+        21 => "Y",
+        22 => "U",
+        23 => "I",
+        24 => "O",
+        25 => "P",
+        28 => "Enter",
+        29 => "Ctrl",
+        30 => "A",
+        31 => "S",
+        32 => "D",
+        33 => "F",
+        34 => "G",
+        35 => "H",
+        36 => "J",
+        37 => "K",
+        38 => "L",
+        42 | 54 => "Shift",
+        44 => "Z",
+        45 => "X",
+        46 => "C",
+        47 => "V",
+        48 => "B",
+        49 => "N",
+        50 => "M",
+        56 => "Alt",
+        57 => "Space",
+        58 => "Caps Lock",
+        59 => "F1",
+        60 => "F2",
+        61 => "F3",
+        62 => "F4",
+        63 => "F5",
+        64 => "F6",
+        65 => "F7",
+        66 => "F8",
+        67 => "F9",
+        68 => "F10",
+        69 => "Num Lock",
+        70 => "Scroll Lock",
+        87 => "F11",
+        88 => "F12",
+        97 => "Right Ctrl",
+        99 => "Print Screen",
+        100 => "Right Alt",
+        102 => "Home",
+        103 => "Up",
+        104 => "Page Up",
+        105 => "Left",
+        106 => "Right",
+        107 => "End",
+        108 => "Down",
+        109 => "Page Down",
+        110 => "Insert",
+        111 => "Delete",
+        119 => "Pause",
+        125 => "Left Windows",
+        126 => "Right Windows",
+        183..=194 => return Some(format!("F{}", code - 183 + 13)),
+        _ => return Some(format!("0x{code:X}")),
+    };
+    if name == "Pause" {
+        None
+    } else {
+        Some(name.to_string())
     }
 }
 

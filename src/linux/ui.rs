@@ -56,6 +56,8 @@ pub struct Display {
     window: Window,
     gc: Gcontext,
     ascii: bool,
+    intro_ru: String,
+    intro_en: String,
     width: u16,
     height: u16,
     text: u32,
@@ -64,11 +66,11 @@ pub struct Display {
     bg: u32,
 }
 
-pub fn open() -> Result<Option<Display>, String> {
+pub fn open(extra_key: Option<&str>) -> Result<Option<Display>, String> {
     if std::env::var_os("DISPLAY").is_none() {
         return Ok(None);
     }
-    Ok(Some(Display::connect()?))
+    Ok(Some(Display::connect(extra_key)?))
 }
 
 pub fn raise_existing() -> bool {
@@ -137,7 +139,7 @@ impl Display {
         self.paint(enabled, true)
     }
 
-    fn connect() -> Result<Self, String> {
+    fn connect(extra_key: Option<&str>) -> Result<Self, String> {
         let (conn, screen_num) = x11rb::connect(None).map_err(xerr)?;
         let screen = &conn.setup().roots[screen_num];
         let atoms = Atoms::new(&conn).map_err(xerr)?.reply().map_err(xerr)?;
@@ -213,6 +215,16 @@ impl Display {
             .map_err(xerr)?;
         conn.map_window(window).map_err(xerr)?;
         conn.flush().map_err(xerr)?;
+        let (intro_ru, intro_en) = match extra_key {
+            Some(name) => (
+                format!("Pause или {name} - исправить текущее слово."),
+                format!("Pause or {name} - fix the current word."),
+            ),
+            None => (
+                LINES_RU[0].to_string(),
+                LINES_EN[0].to_string(),
+            ),
+        };
         let mut display = Self {
             conn,
             atoms,
@@ -220,6 +232,8 @@ impl Display {
             window,
             gc,
             ascii,
+            intro_ru,
+            intro_en,
             width: WIDTH,
             height: HEIGHT,
             text,
@@ -283,7 +297,13 @@ impl Display {
             )
             .map_err(xerr)?;
         let lines = if self.ascii { LINES_EN } else { LINES_RU };
+        let intro = if self.ascii {
+            self.intro_en.clone()
+        } else {
+            self.intro_ru.clone()
+        };
         for (index, line) in lines.iter().enumerate() {
+            let line = if index == 0 { intro.as_str() } else { *line };
             if line.is_empty() {
                 continue;
             }

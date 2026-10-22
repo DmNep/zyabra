@@ -1,11 +1,13 @@
 use windows::core::w;
-use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
+use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, SIZE, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    CreateBitmap, CreateDIBSection, CreateFontW, DeleteObject, GetDC, GetDeviceCaps, ReleaseDC,
-    SetBkMode, SetTextColor, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, CLEARTYPE_QUALITY,
-    CLIP_DEFAULT_PRECIS, COLOR_BTNFACE, DEFAULT_CHARSET, DEFAULT_PITCH, DIB_RGB_COLORS, FW_NORMAL,
-    HBITMAP, HBRUSH, HDC, HFONT, LOGPIXELSY, OUT_DEFAULT_PRECIS, TRANSPARENT,
+    CreateBitmap, CreateDIBSection, CreateFontW, DeleteObject, GetDC, GetDeviceCaps,
+    GetTextExtentPoint32W, ReleaseDC, SelectObject, SetBkMode, SetTextColor, BITMAPINFO,
+    BITMAPINFOHEADER, BI_RGB, CLEARTYPE_QUALITY, CLIP_DEFAULT_PRECIS, COLOR_BTNFACE,
+    DEFAULT_CHARSET, DEFAULT_PITCH, DIB_RGB_COLORS, FW_NORMAL, HBITMAP, HBRUSH, HDC, HFONT,
+    LOGPIXELSY, OUT_DEFAULT_PRECIS, TRANSPARENT,
 };
+use windows::Win32::UI::Input::KeyboardAndMouse::{GetKeyNameTextW, MapVirtualKeyW, MAPVK_VK_TO_VSC};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Shell::{
     ShellExecuteW, Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE,
@@ -229,7 +231,16 @@ fn create_children(parent: HWND) {
     let text_style = WS_CHILD | WS_VISIBLE;
     let button_style = WS_CHILD | WS_VISIBLE | WS_TABSTOP;
     unsafe {
-        let intro = static_text(parent, "Pause - исправить текущее слово.", 0, 0, 10, 10, text_style);
+        let intro_line = intro_text();
+        let intro = static_text(
+            parent,
+            &intro_line,
+            0,
+            0,
+            10,
+            10,
+            text_style | WINDOW_STYLE(0x0000_0080),
+        );
         let explain = static_text(
             parent,
             "Если слово набрано не в той раскладке, Зябра стирает его и пишет заново в правильной, затем переключает раскладку.",
@@ -292,18 +303,79 @@ fn create_children(parent: HWND) {
     layout(parent);
 }
 
+fn intro_text() -> String {
+    match extra_key_name() {
+        Some(name) => format!("Pause или {name} - исправить текущее слово."),
+        None => "Pause - исправить текущее слово.".to_string(),
+    }
+}
+
+fn extra_key_name() -> Option<String> {
+    let vk = super::hook::extra_force_key()?;
+    let name = virtual_key_name(vk);
+    if name.eq_ignore_ascii_case("Pause") {
+        None
+    } else {
+        Some(name)
+    }
+}
+
+/// Windows names a key from its scan code. Print Screen and Pause are the two
+/// codes `MapVirtualKey` does not describe: one comes back as Sys Req, the
+/// other as Right Ctrl.
+fn virtual_key_name(vk: u32) -> String {
+    let (scan, extended) = match vk {
+        0x2C => (0x37, true),
+        0x13 => (0x45, false),
+        code => {
+            let scan = unsafe { MapVirtualKeyW(code, MAPVK_VK_TO_VSC) } & 0xFF;
+            if scan == 0 {
+                return format!("0x{code:X}");
+            }
+            (scan, extended_key(code))
+        }
+    };
+    let mut param = (scan as i32) << 16;
+    if extended {
+        param |= 1 << 24;
+    }
+    let mut buf = [0u16; 64];
+    let written = unsafe { GetKeyNameTextW(param, &mut buf) };
+    if written <= 0 {
+        return format!("0x{vk:X}");
+    }
+    let name = String::from_utf16_lossy(&buf[..written as usize]);
+    let name = name.trim();
+    if name.is_empty() || name.starts_with('<') {
+        format!("0x{vk:X}")
+    } else {
+        name.to_string()
+    }
+}
+
+fn extended_key(vk: u32) -> bool {
+    matches!(
+        vk,
+        0x21 | 0x22 | 0x23 | 0x24 | 0x25 | 0x26 | 0x27 | 0x28 | 0x2D | 0x2E | 0x5B | 0x5C
+            | 0x5D | 0x6F | 0x90 | 0xA3 | 0xA5
+    )
+}
+
 fn layout(parent: HWND) {
-    let handles = {
+    let (handles, font) = {
         let ui = super::ui();
         (
-            ui.intro,
-            ui.explain,
-            ui.safety_title,
-            ui.safety,
-            ui.status,
-            ui.toggle,
-            ui.quit,
-            ui.link,
+            (
+                ui.intro,
+                ui.explain,
+                ui.safety_title,
+                ui.safety,
+                ui.status,
+                ui.toggle,
+                ui.quit,
+                ui.link,
+            ),
+            ui.font,
         )
     };
     let mut rect = RECT::default();
@@ -315,8 +387,14 @@ fn layout(parent: HWND) {
         let width = (rect.right - margin * 2).max(dip(160));
         let line = dip(18);
         let mut y = margin;
-        place(handles.0, margin, y, width, line);
-        y += line + dip(2);
+        let intro = intro_text();
+        let intro_h = if text_wider_than(&intro, font, width - dip(4)) {
+            line * 2
+        } else {
+            line
+        };
+        place(handles.0, margin, y, width, intro_h);
+        y += intro_h + dip(2);
         let explain_h = dip(34);
         place(handles.1, margin, y, width, explain_h);
         y += explain_h + dip(8);
@@ -396,6 +474,28 @@ unsafe fn github_link(parent: HWND) -> Result<HWND, windows::core::Error> {
         None,
         None,
     )
+}
+
+fn text_wider_than(text: &str, font: HFONT, width: i32) -> bool {
+    if font.0.is_null() || width <= 0 {
+        return false;
+    }
+    unsafe {
+        let dc = GetDC(None);
+        if dc.0.is_null() {
+            return false;
+        }
+        let previous = SelectObject(dc, font.into());
+        let wide = utf16(text);
+        let chars = &wide[..wide.len().saturating_sub(1)];
+        let mut size = SIZE::default();
+        let measured = GetTextExtentPoint32W(dc, chars, &mut size).as_bool();
+        if !previous.is_invalid() {
+            let _ = SelectObject(dc, previous);
+        }
+        let _ = ReleaseDC(None, dc);
+        measured && size.cx > width
+    }
 }
 
 fn dip(px: i32) -> i32 {

@@ -11,9 +11,29 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_RBUTTONDOWN, WM_XBUTTONDOWN,
 };
 
+use std::sync::atomic::{AtomicU32, Ordering};
+
 use zyabra::{KeyClass, Term};
 
 use super::{dict, foreground_script, runtime, ui, EXTRA};
+
+static FORCE_KEY: AtomicU32 = AtomicU32::new(0);
+
+pub(super) fn set_force_key(code: u32) {
+    FORCE_KEY.store(code, Ordering::Relaxed);
+}
+
+pub(super) fn extra_force_key() -> Option<u32> {
+    let code = FORCE_KEY.load(Ordering::Relaxed);
+    (code != 0).then_some(code)
+}
+
+fn is_force_key(vk: u32) -> bool {
+    vk == VK_PAUSE.0 as u32 || {
+        let extra = FORCE_KEY.load(Ordering::Relaxed);
+        extra != 0 && vk == extra
+    }
+}
 
 pub(super) struct Hooks {
     keyboard: HHOOK,
@@ -90,7 +110,7 @@ unsafe extern "system" fn mouse_proc(code: i32, wparam: WPARAM, lparam: LPARAM) 
 
 fn handle_key(vk: u32, scan: u16, is_up: bool) -> bool {
     if is_up {
-        if vk == VK_PAUSE.0 as u32 {
+        if is_force_key(vk) {
             let mut rt = runtime();
             rt.pause_down = false;
             return rt.enabled;
@@ -109,7 +129,7 @@ fn handle_key(vk: u32, scan: u16, is_up: bool) -> bool {
         return false;
     }
 
-    if vk == VK_PAUSE.0 as u32 {
+    if is_force_key(vk) {
         if rt.pause_down {
             return true;
         }

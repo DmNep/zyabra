@@ -4,11 +4,13 @@
 
 #![forbid(unsafe_code)]
 
+mod args;
 mod decide;
 mod dict;
 mod engine;
 mod keymap;
 
+pub use args::{parse_args, Launch, USAGE};
 pub use decide::{autocorrect, force_convert, Change};
 pub use dict::{HasWords, MapDict, StaticDict};
 pub use engine::{Engine, Rewrite};

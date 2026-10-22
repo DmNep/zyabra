@@ -4,7 +4,7 @@
 
 `ghbdtn` становится `привет`, `руддщ` становится `hello`.
 
-Скачать: [последний релиз](https://github.com/DmNep/zyabra/releases/latest) ([Windows](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.6.exe), [Linux x86_64](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.6-linux-x86_64)).
+Скачать: [последний релиз](https://github.com/DmNep/zyabra/releases/latest) ([Windows](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.7.exe), [Linux x86_64](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.7-linux-x86_64)).
 
 ## Что программа не делает
 
@@ -40,6 +40,7 @@
 
 - Пробел, Enter, Tab или знак препинания заканчивают слово и могут его исправить.
 - `Pause` перекладывает текущее слово даже если его нет в словаре. Каждое следующее нажатие, пока ничего нового не набрано, перекладывает его обратно и снова.
+- Вторую такую клавишу можно задать при запуске, ничего не записывая: `zyabra --key 0x2C`. Код десятичный или с префиксом `0x`. На Windows это виртуальный код (`0x2C` — Print Screen), на Linux — код evdev (Print Screen — `99`). Аргумент хранится в ярлыке или в команде, не в Зябре. Если клавиша задана, окно пишет её имя рядом с Pause. Пока Зябра уже запущена, повторный запуск новый код не подхватывает.
 - «Пауза» в окне или в меню трея останавливает обработку.
 - На Windows сворачивание и крестик прячут окно в трей. «Выход» завершает программу.
 - На Linux крестик и «Выход» завершают программу и отпускают клавиатуру.
@@ -76,7 +77,7 @@ cargo test
 cargo build --release
 ```
 
-Готовый файл Windows: `target/release/zyabra.exe`. В релизе он называется `zyabra-0.1.6.exe`: версия стоит после названия. Linux-файл в том же релизе называется `zyabra-0.1.6-linux-x86_64`. Подпись кода нет, SmartScreen может спросить подтверждение при первом запуске Windows-файла.
+Готовый файл Windows: `target/release/zyabra.exe`. В релизе он называется `zyabra-0.1.7.exe`: версия стоит после названия. Linux-файл в том же релизе называется `zyabra-0.1.7-linux-x86_64`. Подпись кода нет, SmartScreen может спросить подтверждение при первом запуске Windows-файла.
 
 ## Словари
 
@@ -96,7 +97,7 @@ cargo build --release
 
 ## English
 
-Zyabra is a local RU/EN layout switcher. A word typed in the wrong layout is rewritten and the layout flips. Pause toggles that same word on every press. The current word and that one replacement stay in memory. Nothing is written to disk, the clipboard is not used, and the program never opens a network connection.
+Zyabra is a local RU/EN layout switcher. A word typed in the wrong layout is rewritten and the layout flips. Pause toggles that same word on every press. Another key can be added at launch with `--key CODE`; the window shows its name next to Pause, and Zyabra does not store the code. The current word and that one replacement stay in memory. Nothing is written to disk, the clipboard is not used, and the program never opens a network connection.
 
 ## License
 

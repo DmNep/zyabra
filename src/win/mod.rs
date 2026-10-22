@@ -13,7 +13,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     GetForegroundWindow, GetGUIThreadInfo, GetWindowThreadProcessId, MessageBoxW, PostMessageW,
-    GUITHREADINFO, MB_ICONERROR, MB_OK, WM_INPUTLANGCHANGEREQUEST,
+    GUITHREADINFO, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, WM_INPUTLANGCHANGEREQUEST,
 };
 
 use zyabra::{Engine, StaticDict};
@@ -78,7 +78,10 @@ fn ui() -> std::sync::MutexGuard<'static, UiState> {
     UI.lock().unwrap_or_else(|err| err.into_inner())
 }
 
-pub fn run() -> Result<(), String> {
+pub fn run(force_key: Option<u32>) -> Result<(), String> {
+    if let Some(code) = force_key {
+        hook::set_force_key(code);
+    }
     let dict = StaticDict::load();
     DICT.set(dict)
         .map_err(|_| "словарь уже загружен".to_string())?;
@@ -86,15 +89,23 @@ pub fn run() -> Result<(), String> {
 }
 
 pub fn report_error(message: &str) {
+    report(message, true);
+}
+
+pub fn report_info(message: &str) {
+    report(message, false);
+}
+
+fn report(message: &str, error: bool) {
     let wide = utf16(message);
     let title = utf16("Зябра");
+    let icon = if error {
+        MB_ICONERROR
+    } else {
+        MB_ICONINFORMATION
+    };
     unsafe {
-        let _ = MessageBoxW(
-            None,
-            PCWSTR(wide.as_ptr()),
-            PCWSTR(title.as_ptr()),
-            MB_OK | MB_ICONERROR,
-        );
+        let _ = MessageBoxW(None, PCWSTR(wide.as_ptr()), PCWSTR(title.as_ptr()), MB_OK | icon);
     }
 }
 
