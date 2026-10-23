@@ -42,6 +42,14 @@ impl StaticDict {
     pub fn load() -> Self {
         let mut en = collect(inflate(include_bytes!(concat!(env!("OUT_DIR"), "/en.txt.gz"))), is_en_word);
         let mut ru = collect(inflate(include_bytes!(concat!(env!("OUT_DIR"), "/ru.txt.gz"))), is_ru_word);
+        en.extend(load_extra(
+            include_str!("../dictionaries/extra-en.txt"),
+            is_extra_en,
+        ));
+        ru.extend(load_extra(
+            include_str!("../dictionaries/extra-ru.txt"),
+            is_ru_word,
+        ));
         en.sort_unstable();
         en.dedup();
         ru.sort_unstable();
@@ -82,8 +90,30 @@ fn collect(text: &'static str, keep: fn(&str) -> bool) -> Vec<&'static str> {
         .collect()
 }
 
+fn load_extra(text: &str, keep: fn(&str) -> bool) -> Vec<&'static str> {
+    text.lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .filter_map(|line| {
+            let word = normalize(line);
+            if keep(&word) {
+                Some(&*Box::leak(word.into_boxed_str()))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 fn is_en_word(word: &str) -> bool {
     (2..=20).contains(&word.len()) && word.bytes().all(|b| b.is_ascii_lowercase())
+}
+
+/// Letters, or a run of periods. A period is the English face of `ю`.
+fn is_extra_en(word: &str) -> bool {
+    let len = word.len();
+    (2..=20).contains(&len)
+        && (word.bytes().all(|b| b.is_ascii_lowercase()) || word.bytes().all(|b| b == b'.'))
 }
 
 fn is_ru_word(word: &str) -> bool {

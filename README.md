@@ -4,7 +4,7 @@
 
 `ghbdtn` становится `привет`, `руддщ` становится `hello`.
 
-Скачать: [последний релиз](https://github.com/DmNep/zyabra/releases/latest) ([Windows](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.7.exe), [Linux x86_64](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.7-linux-x86_64)).
+Скачать: [последний релиз](https://github.com/DmNep/zyabra/releases/latest) ([Windows](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.8.exe), [Linux x86_64](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.8-linux-x86_64)).
 
 ## Что программа не делает
 
@@ -77,13 +77,17 @@ cargo test
 cargo build --release
 ```
 
-Готовый файл Windows: `target/release/zyabra.exe`. В релизе он называется `zyabra-0.1.7.exe`: версия стоит после названия. Linux-файл в том же релизе называется `zyabra-0.1.7-linux-x86_64`. Подпись кода нет, SmartScreen может спросить подтверждение при первом запуске Windows-файла.
+Готовый файл Windows: `target/release/zyabra.exe`. В релизе он называется `zyabra-0.1.8.exe`: версия стоит после названия. Linux-файл в том же релизе называется `zyabra-0.1.8-linux-x86_64`. Подпись кода нет, SmartScreen может спросить подтверждение при первом запуске Windows-файла.
 
 ## Словари
 
 Английский список — ENABLE, public domain. Русский — словоформы из [danakt/russian-words](https://github.com/danakt/russian-words), MIT. Подробности в `NOTICE.md`.
 
-`tools/build_dicts.py` заново собирает `dictionaries/` из уже скачанных файлов в `third_party/`. Программа этот скрипт не запускает. В файл Зябры списки попадают сжатыми и разворачиваются в памяти при запуске.
+`tools/build_dicts.py` заново собирает `dictionaries/en.txt` и `dictionaries/ru.txt` из уже скачанных файлов в `third_party/`. Программа этот скрипт не запускает. В файл Зябры списки попадают сжатыми и разворачиваются в памяти при запуске.
+
+Короткие добавки лежат отдельно: `dictionaries/extra-en.txt` и `dictionaries/extra-ru.txt`. Скрипт их не перезаписывает. Новое слово добавляется коммитом в репозиторий и попадает в программу при следующей сборке. Уже собранный файл строку сам не подхватывает.
+
+В строке пишется слово того языка, которым оно является: строчными буквами, от 2 до 20 знаков. Пар словарь не хранит. Набранное меняется, только когда в своём списке его нет, а те же клавиши есть в другом. В английском списке есть `...`, поэтому `ююю` становится `...`: три «ю» по-русски словом не считаются, а эта клавиша по-английски печатает точку. В русский список добавляют слово, которого нет среди словоформ. Тогда набранное по-русски остаётся, а английские клавиши этого слова перекладываются в него, если сами словом не являются. Буква ё в строке пишется как е.
 
 ## Ограничения
 
@@ -97,7 +101,7 @@ cargo build --release
 
 ## English
 
-Zyabra is a local RU/EN layout switcher. A word typed in the wrong layout is rewritten and the layout flips. Pause toggles that same word on every press. Another key can be added at launch with `--key CODE`; the window shows its name next to Pause, and Zyabra does not store the code. The current word and that one replacement stay in memory. Nothing is written to disk, the clipboard is not used, and the program never opens a network connection.
+Zyabra is a local RU/EN layout switcher. A word typed in the wrong layout is rewritten and the layout flips. Pause toggles that same word on every press. Another key can be added at launch with `--key CODE`; the window shows its name next to Pause, and Zyabra does not store the code. Short additions live in `dictionaries/extra-en.txt` and `dictionaries/extra-ru.txt` and are brought in by a commit; `...` is an English entry, so `ююю` is rewritten as `...`. The current word and that one replacement stay in memory. Nothing is written to disk, the clipboard is not used, and the program never opens a network connection.
 
 ## License
 

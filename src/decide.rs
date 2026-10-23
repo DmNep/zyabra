@@ -162,6 +162,12 @@ mod tests {
         assert!(autocorrect("привет", &dict).is_none());
         assert!(autocorrect("the", &dict).is_none());
         assert!(autocorrect("собака", &dict).is_none());
+        assert!(dict.has(Script::En, "..."));
+        let dots = autocorrect("ююю", &dict).unwrap();
+        assert_eq!(dots.text, "...");
+        assert_eq!(dots.switch_to, Script::En);
+        assert_eq!(autocorrect("ЮЮЮ", &dict).unwrap().text, "...");
+        assert!(autocorrect("юю", &dict).is_none());
         for word in [
             "code", "file", "data", "true", "false", "name", "test", "main",
         ] {
