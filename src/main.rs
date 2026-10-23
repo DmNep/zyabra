@@ -11,7 +11,7 @@ mod linux;
 fn main() {
     let force_key = match zyabra::parse_args(std::env::args().skip(1)) {
         Ok(zyabra::Launch::Help) => {
-            explain(zyabra::USAGE, false);
+            explain(&zyabra::help_text(&zyabra::installed_path()), false);
             return;
         }
         Ok(zyabra::Launch::Run(key)) => key,
@@ -43,6 +43,9 @@ fn main() {
 fn explain(message: &str, error: bool) {
     #[cfg(windows)]
     {
+        if win::write_console(message, error) {
+            return;
+        }
         if error {
             win::report_error(message);
         } else {

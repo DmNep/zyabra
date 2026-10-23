@@ -38,7 +38,7 @@ pub fn run(force_key: Option<u32>) -> Result<(), String> {
     let keys = Keys::open()?;
     let caps = keys.caps_lit();
     if display.is_some() {
-        eprintln!("Зябра слушает клавиатуру. Крестик или «Выход» отпускают её.");
+        eprintln!("Зябра слушает клавиатуру. Крестик или \"Выход\" отпускают её.");
     } else {
         eprintln!("Зябра слушает клавиатуру без окна. Ctrl+C отпускает её.");
     }
@@ -70,6 +70,7 @@ pub fn run(force_key: Option<u32>) -> Result<(), String> {
                     app.swallowed.clear();
                 }
                 UiEvent::Link => open_repo(),
+                UiEvent::Help => {}
             }
             let enabled = app.enabled;
             if let Some(display) = app.display.as_mut() {

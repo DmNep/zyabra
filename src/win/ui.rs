@@ -34,6 +34,7 @@ const SS_NOTIFY: u32 = 256;
 const IDC_TOGGLE: u16 = 1;
 const IDC_EXIT: u16 = 2;
 const IDC_LINK: u16 = 3;
+const IDC_HELP: u16 = 4;
 const CLASS: windows::core::PCWSTR = w!("ZyabraWindow");
 const TITLE: &str = concat!("Зябра ", env!("CARGO_PKG_VERSION"));
 const REPO: &str = "https://github.com/DmNep/zyabra";
@@ -68,7 +69,7 @@ pub(super) fn run_window() -> Result<(), String> {
         }
 
         let title = utf16(TITLE);
-        let width = dip(440);
+        let width = dip(520);
         let height = dip(304);
         let x = (GetSystemMetrics(SM_CXSCREEN) - width) / 2;
         let y = (GetSystemMetrics(SM_CYSCREEN) - height) / 2;
@@ -157,7 +158,7 @@ unsafe extern "system" fn wnd_proc(
         }
         WM_GETMINMAXINFO => {
             let info = &mut *(lparam.0 as *mut MINMAXINFO);
-            info.ptMinTrackSize.x = dip(400);
+            info.ptMinTrackSize.x = dip(480);
             info.ptMinTrackSize.y = dip(280);
             LRESULT(0)
         }
@@ -180,6 +181,9 @@ unsafe extern "system" fn wnd_proc(
                     let _ = DestroyWindow(hwnd);
                 }
                 IDC_LINK => open_repo(),
+                IDC_HELP => {
+                    super::report_info(&zyabra::help_text(&zyabra::installed_path()));
+                }
                 _ => {}
             }
             LRESULT(0)
@@ -253,7 +257,7 @@ fn create_children(parent: HWND) {
         let safety_title = static_text(parent, "Безопасность:", 0, 0, 10, 10, text_style);
         let safety = static_text(
             parent,
-            "В памяти только текущее слово и одна последняя замена. На диск набранное не пишется. В интернет программа не ходит: словарь уже внутри файла. Поля пароля не читаются. «Пауза» останавливает обработку.",
+            "В памяти только текущее слово и одна последняя замена. На диск набранное не пишется. В интернет программа не ходит: словарь уже внутри файла. Поля пароля не читаются. \"Пауза\" останавливает обработку.",
             0,
             0,
             10,
@@ -271,6 +275,7 @@ fn create_children(parent: HWND) {
         );
         let toggle = button(parent, "Пауза", 0, 0, 10, 10, IDC_TOGGLE, button_style);
         let quit = button(parent, "Выход", 0, 0, 10, 10, IDC_EXIT, button_style);
+        let help = button(parent, "Справка", 0, 0, 10, 10, IDC_HELP, button_style);
         let link = github_link(parent);
         let font = segoe(false);
         let link_font = segoe(true);
@@ -282,6 +287,7 @@ fn create_children(parent: HWND) {
             status.unwrap_or(HWND(std::ptr::null_mut())),
             toggle.unwrap_or(HWND(std::ptr::null_mut())),
             quit.unwrap_or(HWND(std::ptr::null_mut())),
+            help.unwrap_or(HWND(std::ptr::null_mut())),
         ];
         for hwnd in handles {
             use_font(hwnd, font);
@@ -296,6 +302,7 @@ fn create_children(parent: HWND) {
         ui.status = handles[4];
         ui.toggle = handles[5];
         ui.quit = handles[6];
+        ui.help = handles[7];
         ui.link = link;
         ui.font = font;
         ui.link_font = link_font;
@@ -373,6 +380,7 @@ fn layout(parent: HWND) {
                 ui.status,
                 ui.toggle,
                 ui.quit,
+                ui.help,
                 ui.link,
             ),
             ui.font,
@@ -409,13 +417,16 @@ fn layout(parent: HWND) {
         let btn_y = rect.bottom - margin - btn_h;
         let quit_w = dip(76);
         let toggle_w = dip(108);
+        let help_w = dip(96);
         let gap = dip(8);
         let quit_x = rect.right - margin - quit_w;
         let toggle_x = quit_x - gap - toggle_w;
+        let help_x = toggle_x - gap - help_w;
         place(handles.5, toggle_x, btn_y, toggle_w, btn_h);
         place(handles.6, quit_x, btn_y, quit_w, btn_h);
-        let link_w = (toggle_x - margin - gap).max(dip(40));
-        place(handles.7, margin, btn_y + dip(2), link_w, line);
+        place(handles.7, help_x, btn_y, help_w, btn_h);
+        let link_w = (help_x - margin - gap).max(dip(40));
+        place(handles.8, margin, btn_y + dip(2), link_w, line);
     }
 }
 
@@ -612,11 +623,18 @@ fn show_menu(hwnd: HWND) {
             "Продолжить"
         });
         let exit = utf16("Выход");
+        let help = utf16("Справка");
         let _ = AppendMenuW(
             menu,
             MF_STRING,
             IDC_TOGGLE as usize,
             windows::core::PCWSTR(pause.as_ptr()),
+        );
+        let _ = AppendMenuW(
+            menu,
+            MF_STRING,
+            IDC_HELP as usize,
+            windows::core::PCWSTR(help.as_ptr()),
         );
         let _ = AppendMenuW(
             menu,

@@ -10,7 +10,7 @@ mod dict;
 mod engine;
 mod keymap;
 
-pub use args::{parse_args, Launch, USAGE};
+pub use args::{help_text, installed_path, parse_args, Launch, USAGE};
 pub use decide::{autocorrect, force_convert, Change};
 pub use dict::{HasWords, MapDict, StaticDict};
 pub use engine::{Engine, Rewrite};

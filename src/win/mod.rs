@@ -6,7 +6,10 @@ use std::sync::{Mutex, OnceLock};
 
 use windows::core::w;
 use windows::core::PCWSTR;
-use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
+use windows::Win32::Foundation::{HANDLE, HWND, LPARAM, WPARAM};
+use windows::Win32::System::Console::{
+    AttachConsole, FreeConsole, WriteConsoleW, ATTACH_PARENT_PROCESS,
+};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetKeyboardLayout, LoadKeyboardLayoutW, ACTIVATE_KEYBOARD_LAYOUT_FLAGS, KLF_NOTELLSHELL,
     KLF_SUBSTITUTE_OK,
@@ -37,6 +40,7 @@ struct UiState {
     status: HWND,
     toggle: HWND,
     quit: HWND,
+    help: HWND,
     link: HWND,
     icon: windows::Win32::UI::WindowsAndMessaging::HICON,
     font: windows::Win32::Graphics::Gdi::HFONT,
@@ -61,6 +65,7 @@ static UI: Mutex<UiState> = Mutex::new(UiState {
     status: HWND(std::ptr::null_mut()),
     toggle: HWND(std::ptr::null_mut()),
     quit: HWND(std::ptr::null_mut()),
+    help: HWND(std::ptr::null_mut()),
     link: HWND(std::ptr::null_mut()),
     icon: windows::Win32::UI::WindowsAndMessaging::HICON(std::ptr::null_mut()),
     font: windows::Win32::Graphics::Gdi::HFONT(std::ptr::null_mut()),
@@ -94,6 +99,41 @@ pub fn report_error(message: &str) {
 
 pub fn report_info(message: &str) {
     report(message, false);
+}
+
+/// Write `message` to the console Zyabra was started from.
+/// A release build has no console of its own. A double-click has no parent
+/// console either, and then this returns false so the caller can use a window.
+pub fn write_console(message: &str, error: bool) -> bool {
+    use std::io::Write;
+    let wrote = if error {
+        writeln!(std::io::stderr(), "{message}")
+    } else {
+        writeln!(std::io::stdout(), "{message}")
+    };
+    if wrote.is_ok() {
+        return true;
+    }
+    unsafe {
+        if AttachConsole(ATTACH_PARENT_PROCESS).is_err() {
+            return false;
+        }
+        let Ok(file) = std::fs::OpenOptions::new().write(true).open("CONOUT$") else {
+            let _ = FreeConsole();
+            return false;
+        };
+        let handle = HANDLE(std::os::windows::io::AsRawHandle::as_raw_handle(&file));
+        let mut wide: Vec<u16> = message.encode_utf16().collect();
+        if !message.ends_with('\n') {
+            wide.push('\r' as u16);
+            wide.push('\n' as u16);
+        }
+        let mut written = 0u32;
+        let ok = WriteConsoleW(handle, &wide, Some(&mut written), None).is_ok();
+        drop(file);
+        let _ = FreeConsole();
+        ok
+    }
 }
 
 fn report(message: &str, error: bool) {

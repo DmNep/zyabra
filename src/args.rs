@@ -2,13 +2,39 @@
 
 pub const USAGE: &str = "\
 Зябра [--key КОД]
+Зябра help
 
 КОД — дополнительная клавиша перекладывания, рядом с Pause.
 Десятичное число или шестнадцатеричное с префиксом 0x.
 Windows: виртуальный код клавиши. Linux: код evdev.
-Пример: zyabra --key 0x2C
 
-Без аргумента работает только Pause. Зябра этот код никуда не записывает.";
+Без аргумента работает только Pause. Зябра этот код никуда не записывает.
+";
+
+/// Help for `zyabra help` and the window button. `program` is the file to put
+/// in a Windows shortcut's Target field.
+pub fn help_text(program: &str) -> String {
+    format!(
+        "{USAGE}\n\
+Ярлык Windows, поле \"Объект\":\n\
+\"{program}\" --key 0x2C\n\
+\n\
+Кавычки вокруг пути нужны, если в нём есть пробел.\n\
+0x2C на Windows — Print Screen. На Linux та же клавиша — 99.\n\
+Пока Зябра уже запущена, повторный запуск новый код не подхватывает.\n"
+    )
+}
+
+/// Path of the running file, for the shortcut example.
+pub fn installed_path() -> String {
+    let shown = std::env::current_exe()
+        .map(|path| path.display().to_string())
+        .unwrap_or_else(|_| "zyabra".to_string());
+    shown
+        .strip_prefix(r"\\?\")
+        .unwrap_or(&shown)
+        .to_string()
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Launch {
@@ -25,7 +51,7 @@ where
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         let arg = arg.as_ref();
-        if arg == "--help" || arg == "-h" {
+        if arg == "--help" || arg == "-h" || arg.eq_ignore_ascii_case("help") {
             return Ok(Launch::Help);
         }
         let inline = arg.strip_prefix("--key=");
@@ -84,6 +110,17 @@ mod tests {
         assert_eq!(parse_args(["--key=0x2c"]), Ok(Launch::Run(Some(44))));
         assert_eq!(parse_args(["--help"]), Ok(Launch::Help));
         assert_eq!(parse_args(["-h"]), Ok(Launch::Help));
+        assert_eq!(parse_args(["help"]), Ok(Launch::Help));
+        assert_eq!(parse_args(["Help"]), Ok(Launch::Help));
+    }
+
+    #[test]
+    fn help_shows_the_shortcut_target() {
+        let text = help_text(r"C:\zyabra\zyabra.exe");
+        assert!(text.contains("Зябра help"));
+        assert!(text.contains("Объект"));
+        assert!(text.contains("\"C:\\zyabra\\zyabra.exe\" --key 0x2C"));
+        assert!(parse_args(["--key", "help"]).is_err());
     }
 
     #[test]

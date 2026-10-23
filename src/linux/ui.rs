@@ -8,7 +8,7 @@ use x11rb::rust_connection::RustConnection;
 use x11rb::wrapper::ConnectionExt as _;
 
 const WIDTH: u16 = 560;
-const HEIGHT: u16 = 320;
+const HEIGHT: u16 = 400;
 
 const LINES_RU: &[&str] = &[
     "Pause - исправить текущее слово.",
@@ -19,7 +19,7 @@ const LINES_RU: &[&str] = &[
     "В памяти только текущее слово и одна последняя замена. На диск",
     "набранное не пишется. В интернет программа не ходит: словарь уже",
     "внутри файла. Поля пароля на Linux не отличить, клавиши читаются.",
-    "«Пауза» останавливает обработку. Крестик завершает программу.",
+    "\"Пауза\" останавливает обработку. Крестик завершает программу.",
 ];
 
 const LINES_EN: &[&str] = &[
@@ -47,6 +47,7 @@ pub enum UiEvent {
     Quit,
     Toggle,
     Link,
+    Help,
 }
 
 pub struct Display {
@@ -58,6 +59,9 @@ pub struct Display {
     ascii: bool,
     intro_ru: String,
     intro_en: String,
+    help_ru: Vec<String>,
+    help_en: Vec<String>,
+    showing_help: bool,
     width: u16,
     height: u16,
     text: u32,
@@ -234,6 +238,9 @@ impl Display {
             ascii,
             intro_ru,
             intro_en,
+            help_ru: wrap_lines(&zyabra::help_text(&zyabra::installed_path()), 68),
+            help_en: english_help(&zyabra::installed_path()),
+            showing_help: false,
             width: WIDTH,
             height: HEIGHT,
             text,
@@ -256,7 +263,11 @@ impl Display {
                 self.redraw(enabled)?;
             }
             Event::ButtonPress(press) if press.event == self.window => {
-                return Ok(self.hit(press.event_x, press.event_y));
+                let hit = self.hit(press.event_x, press.event_y);
+                if matches!(hit, Some(UiEvent::Help)) {
+                    self.showing_help = !self.showing_help;
+                }
+                return Ok(hit);
             }
             Event::ClientMessage(message)
                 if message.format == 32
@@ -296,18 +307,41 @@ impl Display {
                     .background(self.bg),
             )
             .map_err(xerr)?;
-        let lines = if self.ascii { LINES_EN } else { LINES_RU };
+        let showing_help = self.showing_help;
         let intro = if self.ascii {
             self.intro_en.clone()
         } else {
             self.intro_ru.clone()
         };
+        let lines: Vec<String> = if showing_help {
+            if self.ascii {
+                self.help_en.clone()
+            } else {
+                self.help_ru.clone()
+            }
+        } else {
+            let source: &[&str] = if self.ascii { LINES_EN } else { LINES_RU };
+            source
+                .iter()
+                .enumerate()
+                .map(|(index, line)| {
+                    if index == 0 {
+                        intro.clone()
+                    } else {
+                        (*line).to_string()
+                    }
+                })
+                .collect()
+        };
         for (index, line) in lines.iter().enumerate() {
-            let line = if index == 0 { intro.as_str() } else { *line };
             if line.is_empty() {
                 continue;
             }
+            let line = line.as_str();
             let y = 28 + (index as i16) * 18;
+            if y > self.height as i16 - 80 {
+                break;
+            }
             if self.ascii {
                 self.conn
                     .image_text8(self.window, self.gc, 16, y, line.as_bytes())
@@ -334,15 +368,18 @@ impl Display {
         }
         let status_y = self.height as i16 - 72;
         let status = status_line(self.ascii, enabled);
-        if self.ascii {
-            self.conn
-                .image_text8(self.window, self.gc, 16, status_y, status.as_bytes())
-                .map_err(xerr)?;
-        } else {
-            self.conn
-                .image_text16(self.window, self.gc, 16, status_y, &xchars(status))
-                .map_err(xerr)?;
+        if !self.showing_help {
+            if self.ascii {
+                self.conn
+                    .image_text8(self.window, self.gc, 16, status_y, status.as_bytes())
+                    .map_err(xerr)?;
+            } else {
+                self.conn
+                    .image_text16(self.window, self.gc, 16, status_y, &xchars(status))
+                    .map_err(xerr)?;
+            }
         }
+        let showing_help = self.showing_help;
         for area in self.areas() {
             if area.fill {
                 self.conn
@@ -390,7 +427,7 @@ impl Display {
                     )
                     .map_err(xerr)?;
             }
-            let label = area.label(self.ascii, enabled);
+            let label = area.label(self.ascii, enabled, showing_help);
             let text_y = if area.fill { area.y + 18 } else { area.y + 14 };
             if self.ascii {
                 self.conn
@@ -412,11 +449,23 @@ impl Display {
         Ok(())
     }
 
-    fn areas(&self) -> [Area; 3] {
+    fn areas(&self) -> [Area; 4] {
         let y = self.height as i16 - 40;
         let exit_x = self.width as i16 - 16 - 76;
         let toggle_x = exit_x - 8 - 132;
+        let help_w = 110;
+        let help_x = toggle_x - 8 - help_w;
+        let link_w = (help_x - 16 - 8).max(40) as u16;
         [
+            Area {
+                x: help_x,
+                y,
+                w: help_w as u16,
+                h: 26,
+                fill: true,
+                event: UiEvent::Help,
+                kind: AreaKind::Help,
+            },
             Area {
                 x: toggle_x,
                 y,
@@ -438,7 +487,7 @@ impl Display {
             Area {
                 x: 16,
                 y: self.height as i16 - 24,
-                w: 230,
+                w: link_w,
                 h: 18,
                 fill: false,
                 event: UiEvent::Link,
@@ -462,10 +511,11 @@ enum AreaKind {
     Toggle,
     Exit,
     Link,
+    Help,
 }
 
 impl Area {
-    fn label(&self, ascii: bool, enabled: bool) -> &'static str {
+    fn label(&self, ascii: bool, enabled: bool, help_open: bool) -> &'static str {
         match self.kind {
             AreaKind::Toggle if ascii && enabled => "Pause",
             AreaKind::Toggle if ascii => "Resume",
@@ -474,8 +524,59 @@ impl Area {
             AreaKind::Exit if ascii => "Exit",
             AreaKind::Exit => "Выход",
             AreaKind::Link => "github.com/DmNep/zyabra",
+            AreaKind::Help if help_open && ascii => "Back",
+            AreaKind::Help if help_open => "Назад",
+            AreaKind::Help if ascii => "Help",
+            AreaKind::Help => "Справка",
         }
     }
+}
+
+fn english_help(program: &str) -> Vec<String> {
+    wrap_lines(
+        &format!(
+            "\
+zyabra help
+zyabra --key CODE adds a key beside Pause.
+CODE is decimal or 0x. Windows: virtual-key.
+Linux: evdev code. No code means Pause only.
+Zyabra does not store the code.
+
+Windows shortcut, Target field:
+\"{program}\" --key 0x2C
+
+Quote the path when it contains a space.
+0x2C on Windows is Print Screen. On Linux it is 99.
+A second launch ignores a new code.
+"
+        ),
+        68,
+    )
+}
+
+fn wrap_lines(text: &str, width: usize) -> Vec<String> {
+    let mut out = Vec::new();
+    for line in text.lines() {
+        if line.is_empty() {
+            out.push(String::new());
+            continue;
+        }
+        let mut rest = line.to_string();
+        while rest.chars().count() > width {
+            let chars: Vec<char> = rest.chars().collect();
+            let split = chars[..width]
+                .iter()
+                .rposition(|ch| *ch == ' ')
+                .filter(|index| *index > width / 2)
+                .unwrap_or(width);
+            out.push(chars[..split].iter().collect());
+            rest = chars[split..].iter().collect::<String>().trim_start().to_string();
+        }
+        if !rest.is_empty() {
+            out.push(rest);
+        }
+    }
+    out
 }
 
 fn status_line(ascii: bool, enabled: bool) -> &'static str {
