@@ -4,7 +4,7 @@
 
 `ghbdtn` становится `привет`, `руддщ` становится `hello`.
 
-Скачать: [последний релиз](https://github.com/DmNep/zyabra/releases/latest) ([Windows](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.9.exe), [Linux x86_64](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.9-linux-x86_64)).
+Скачать: [последний релиз](https://github.com/DmNep/zyabra/releases/latest) ([Windows](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.10.exe), [Linux x86_64](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.10-linux-x86_64)).
 
 ## Что программа не делает
 
@@ -40,7 +40,7 @@
 
 - Пробел, Enter, Tab или знак препинания заканчивают слово и могут его исправить.
 - `Pause` перекладывает текущее слово даже если его нет в словаре. Каждое следующее нажатие, пока ничего нового не набрано, перекладывает его обратно и снова.
-- Вторую такую клавишу можно задать при запуске, ничего не записывая: `zyabra --key 0x2C`. Код десятичный или с префиксом `0x`. На Windows это виртуальный код (`0x2C` — Print Screen), на Linux — код evdev (Print Screen — `99`). Аргумент хранится в ярлыке или в команде, не в Зябре. Если клавиша задана, окно пишет её имя рядом с Pause. Пока Зябра уже запущена, повторный запуск новый код не подхватывает.
+- Вторую такую клавишу можно задать при запуске, ничего не записывая: `zyabra --key 0x2C`. Код десятичный или с префиксом `0x`. На Windows это виртуальный код (`0x2C` — Print Screen), на Linux — код evdev (Print Screen — `99`). `zyabra --key 2sh` перекладывает слово со второго Shift подряд, не позже 0,4 с и без другой клавиши между ними. Сам Shift при этом не глотается: заглавные, `!` и `?` остаются. Удержание Shift не считается. Аргумент хранится в ярлыке или в команде, не в Зябре. Если клавиша задана, окно пишет её имя рядом с Pause. Пока Зябра уже запущена, повторный запуск новый код не подхватывает.
 - `zyabra help` печатает справку в консоль. В окне тот же текст открывает кнопка "Справка" и пункт меню трея. В ярлыке Windows поле "Объект" такое: `"C:\путь\zyabra.exe" --key 0x2C`. Справка подставляет путь к запущенному файлу. Кавычки вокруг пути нужны, если в нём есть пробел.
 - "Пауза" в окне или в меню трея останавливает обработку.
 - На Windows сворачивание и крестик прячут окно в трей. "Выход" завершает программу.
@@ -78,7 +78,7 @@ cargo test
 cargo build --release
 ```
 
-Готовый файл Windows: `target/release/zyabra.exe`. В релизе он называется `zyabra-0.1.9.exe`: версия стоит после названия. Linux-файл в том же релизе называется `zyabra-0.1.9-linux-x86_64`. Подпись кода нет, SmartScreen может спросить подтверждение при первом запуске Windows-файла.
+Готовый файл Windows: `target/release/zyabra.exe`. В релизе он называется `zyabra-0.1.10.exe`: версия стоит после названия. Linux-файл в том же релизе называется `zyabra-0.1.10-linux-x86_64`. Подпись кода нет, SmartScreen может спросить подтверждение при первом запуске Windows-файла.
 
 ## Словари
 
@@ -102,7 +102,7 @@ cargo build --release
 
 ## English
 
-Zyabra is a local RU/EN layout switcher. A word typed in the wrong layout is rewritten and the layout flips. Pause toggles that same word on every press. Another key can be added at launch with `--key CODE`; the window shows its name next to Pause, and Zyabra does not store the code. Short additions live in `dictionaries/extra-en.txt` and `dictionaries/extra-ru.txt` and are brought in by a commit; `...` is an English entry, so `ююю` is rewritten as `...`. The current word and that one replacement stay in memory. Nothing is written to disk, the clipboard is not used, and the program never opens a network connection.
+Zyabra is a local RU/EN layout switcher. A word typed in the wrong layout is rewritten and the layout flips. Pause toggles that same word on every press. Another key can be added at launch with `--key CODE`; `--key 2sh` converts on a second Shift press and still lets Shift type capitals. The window shows the name next to Pause, and Zyabra does not store the code. Short additions live in `dictionaries/extra-en.txt` and `dictionaries/extra-ru.txt` and are brought in by a commit; `...` is an English entry, so `ююю` is rewritten as `...`. The current word and that one replacement stay in memory. Nothing is written to disk, the clipboard is not used, and the program never opens a network connection.
 
 ## License
 

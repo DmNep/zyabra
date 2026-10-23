@@ -538,15 +538,17 @@ fn english_help(program: &str) -> Vec<String> {
             "\
 zyabra help
 zyabra --key CODE adds a key beside Pause.
-CODE is decimal or 0x. Windows: virtual-key.
+CODE is decimal, 0x, or 2sh for a second Shift.
 Linux: evdev code. No code means Pause only.
 Zyabra does not store the code.
 
 Windows shortcut, Target field:
 \"{program}\" --key 0x2C
+\"{program}\" --key 2sh
 
 Quote the path when it contains a space.
 0x2C on Windows is Print Screen. On Linux it is 99.
+2sh converts on the second Shift, within 0.4 s.
 A second launch ignores a new code.
 "
         ),

@@ -311,6 +311,9 @@ fn create_children(parent: HWND) {
 }
 
 fn intro_text() -> String {
+    if super::hook::double_shift_enabled() {
+        return "Pause или Shift-Shift - исправить текущее слово.".to_string();
+    }
     match extra_key_name() {
         Some(name) => format!("Pause или {name} - исправить текущее слово."),
         None => "Pause - исправить текущее слово.".to_string(),

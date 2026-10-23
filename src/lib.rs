@@ -9,8 +9,10 @@ mod decide;
 mod dict;
 mod engine;
 mod keymap;
+mod shiftpair;
 
-pub use args::{help_text, installed_path, parse_args, Launch, USAGE};
+pub use args::{help_text, installed_path, parse_args, Force, Launch, USAGE};
+pub use shiftpair::{ShiftPair, DOUBLE_SHIFT_GAP};
 pub use decide::{autocorrect, force_convert, Change};
 pub use dict::{HasWords, MapDict, StaticDict};
 pub use engine::{Engine, Rewrite};

@@ -13,26 +13,31 @@ use std::collections::HashSet;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 use std::sync::OnceLock;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use evdev::KeyCode;
 
-use zyabra::{Engine, KeyClass, Rewrite, Script, StaticDict, Term};
+use zyabra::{Engine, Force, KeyClass, Rewrite, Script, ShiftPair, StaticDict, Term};
 
 use input::{Incoming, Keys};
 use layout::Layout;
 use ui::{Display, UiEvent};
 
-pub fn run(force_key: Option<u32>) -> Result<(), String> {
-    let force_key = match force_key {
-        Some(code) if code > u32::from(u16::MAX) => {
+pub fn run(force: Option<Force>) -> Result<(), String> {
+    let (force_key, double_shift) = match force {
+        Some(Force::Key(code)) if code > u32::from(u16::MAX) => {
             return Err(format!("код клавиши {code} не помещается в evdev"));
         }
-        Some(code) => Some(code as u16),
-        None => None,
+        Some(Force::Key(code)) => (Some(code as u16), false),
+        Some(Force::DoubleShift) => (None, true),
+        None => (None, false),
     };
     let lock = single_instance()?;
-    let extra_key = force_key.and_then(force_key_label);
+    let extra_key = if double_shift {
+        Some("Shift-Shift".to_string())
+    } else {
+        force_key.and_then(force_key_label)
+    };
     let display = ui::open(extra_key.as_deref())?;
     let layout = layout::detect(display.as_ref().map(|display| (display.conn(), display.root())))?;
     let keys = Keys::open()?;
@@ -50,6 +55,10 @@ pub fn run(force_key: Option<u32>) -> Result<(), String> {
         enabled: true,
         pause_down: false,
         force_key,
+        double_shift,
+        shift_left: false,
+        shift_right: false,
+        shift_pair: ShiftPair::new(),
         caps,
         swallowed: HashSet::new(),
         _lock: lock,
@@ -67,6 +76,7 @@ pub fn run(force_key: Option<u32>) -> Result<(), String> {
                     app.enabled = !app.enabled;
                     app.engine.forget();
                     app.pause_down = false;
+                    app.shift_pair.clear();
                     app.swallowed.clear();
                 }
                 UiEvent::Link => open_repo(),
@@ -94,6 +104,10 @@ struct App {
     enabled: bool,
     pause_down: bool,
     force_key: Option<u16>,
+    double_shift: bool,
+    shift_left: bool,
+    shift_right: bool,
+    shift_pair: ShiftPair,
     caps: bool,
     swallowed: HashSet<u16>,
     _lock: std::fs::File,
@@ -103,6 +117,7 @@ fn on_input(app: &mut App, incoming: Incoming) -> Result<(), String> {
     match incoming {
         Incoming::Click => {
             app.engine.cancel();
+            app.shift_pair.clear();
             Ok(())
         }
         Incoming::Key { code, value } => on_key(app, code, value),
@@ -110,6 +125,12 @@ fn on_input(app: &mut App, incoming: Incoming) -> Result<(), String> {
 }
 
 fn on_key(app: &mut App, code: u16, value: i32) -> Result<(), String> {
+    if app.double_shift && is_shift(code) {
+        return on_double_shift(app, code, value);
+    }
+    if app.double_shift && value == 1 {
+        app.shift_pair.clear();
+    }
     if value == 0 {
         if is_force_key(app, code) {
             app.pause_down = false;
@@ -371,6 +392,57 @@ fn numpad(code: u16) -> Option<char> {
         c if c == KeyCode::KEY_KPDOT.0 => '.',
         _ => return None,
     })
+}
+
+fn on_double_shift(app: &mut App, code: u16, value: i32) -> Result<(), String> {
+    if value == 0 {
+        if code == KeyCode::KEY_LEFTSHIFT.0 {
+            app.shift_left = false;
+        } else {
+            app.shift_right = false;
+        }
+        return app.keys.forward(code, value);
+    }
+    if value != 1 {
+        return app.keys.forward(code, value);
+    }
+    let already = if code == KeyCode::KEY_LEFTSHIFT.0 {
+        app.shift_left
+    } else {
+        app.shift_right
+    };
+    if already {
+        return app.keys.forward(code, value);
+    }
+    let other = if code == KeyCode::KEY_LEFTSHIFT.0 {
+        app.shift_right
+    } else {
+        app.shift_left
+    };
+    if code == KeyCode::KEY_LEFTSHIFT.0 {
+        app.shift_left = true;
+    } else {
+        app.shift_right = true;
+    }
+    if !app.enabled || focus_is_ours(app) {
+        app.shift_pair.clear();
+        if focus_is_ours(app) {
+            app.engine.forget();
+        }
+        return app.keys.forward(code, value);
+    }
+    if other {
+        app.shift_pair.clear();
+        return app.keys.forward(code, value);
+    }
+    if app.shift_pair.press(Instant::now()) {
+        if read_layout(app).is_none() {
+            app.engine.cancel();
+        } else if let Some(rewrite) = app.engine.force() {
+            apply(app, rewrite)?;
+        }
+    }
+    app.keys.forward(code, value)
 }
 
 fn is_modifier(code: u16) -> bool {

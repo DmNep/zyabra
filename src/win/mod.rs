@@ -19,7 +19,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GUITHREADINFO, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, WM_INPUTLANGCHANGEREQUEST,
 };
 
-use zyabra::{Engine, StaticDict};
+use zyabra::{Engine, Force, ShiftPair, StaticDict};
 
 use hook::Hooks;
 
@@ -29,6 +29,10 @@ struct Runtime {
     engine: Engine,
     enabled: bool,
     pause_down: bool,
+    shift_left: bool,
+    shift_right: bool,
+    shift_either: bool,
+    shift_pair: ShiftPair,
 }
 
 struct UiState {
@@ -54,6 +58,10 @@ static RUNTIME: Mutex<Runtime> = Mutex::new(Runtime {
     engine: Engine::new(),
     enabled: true,
     pause_down: false,
+    shift_left: false,
+    shift_right: false,
+    shift_either: false,
+    shift_pair: ShiftPair::new(),
 });
 
 static UI: Mutex<UiState> = Mutex::new(UiState {
@@ -83,9 +91,11 @@ fn ui() -> std::sync::MutexGuard<'static, UiState> {
     UI.lock().unwrap_or_else(|err| err.into_inner())
 }
 
-pub fn run(force_key: Option<u32>) -> Result<(), String> {
-    if let Some(code) = force_key {
-        hook::set_force_key(code);
+pub fn run(force: Option<Force>) -> Result<(), String> {
+    match force {
+        Some(Force::Key(code)) => hook::set_force_key(code),
+        Some(Force::DoubleShift) => hook::set_double_shift(),
+        None => {}
     }
     let dict = StaticDict::load();
     DICT.set(dict)
@@ -220,6 +230,7 @@ pub(super) fn set_enabled(enabled: bool) {
     }
     rt.enabled = enabled;
     rt.pause_down = false;
+    rt.shift_pair.clear();
     drop(rt);
     ui::refresh_status();
 }

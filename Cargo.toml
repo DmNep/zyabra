@@ -1,6 +1,6 @@
 [package]
 name = "zyabra"
-version = "0.1.9"
+version = "0.1.10"
 edition = "2021"
 license = "MIT"
 description = "Local RU/EN keyboard layout switcher that stores nothing and never uses the network"

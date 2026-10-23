@@ -11,16 +11,26 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_RBUTTONDOWN, WM_XBUTTONDOWN,
 };
 
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::time::Instant;
 
 use zyabra::{KeyClass, Term};
 
 use super::{dict, foreground_script, runtime, ui, EXTRA};
 
 static FORCE_KEY: AtomicU32 = AtomicU32::new(0);
+static DOUBLE_SHIFT: AtomicBool = AtomicBool::new(false);
 
 pub(super) fn set_force_key(code: u32) {
     FORCE_KEY.store(code, Ordering::Relaxed);
+}
+
+pub(super) fn set_double_shift() {
+    DOUBLE_SHIFT.store(true, Ordering::Relaxed);
+}
+
+pub(super) fn double_shift_enabled() -> bool {
+    DOUBLE_SHIFT.load(Ordering::Relaxed)
 }
 
 pub(super) fn extra_force_key() -> Option<u32> {
@@ -102,6 +112,7 @@ unsafe extern "system" fn mouse_proc(code: i32, wparam: WPARAM, lparam: LPARAM) 
         {
             if let Ok(mut rt) = super::RUNTIME.try_lock() {
                 rt.engine.cancel();
+                rt.shift_pair.clear();
             }
         }
     }
@@ -109,6 +120,13 @@ unsafe extern "system" fn mouse_proc(code: i32, wparam: WPARAM, lparam: LPARAM) 
 }
 
 fn handle_key(vk: u32, scan: u16, is_up: bool) -> bool {
+    if double_shift_enabled() && is_shift_vk(vk) {
+        return handle_double_shift(vk, is_up);
+    }
+    if double_shift_enabled() && !is_up {
+        runtime().shift_pair.clear();
+    }
+
     if is_up {
         if is_force_key(vk) {
             let mut rt = runtime();
@@ -119,13 +137,16 @@ fn handle_key(vk: u32, scan: u16, is_up: bool) -> bool {
     }
 
     if focus_is_password() || foreground_is_self() {
-        runtime().engine.forget();
+        let mut rt = runtime();
+        rt.shift_pair.clear();
+        rt.engine.forget();
         return false;
     }
 
     let words = dict();
     let mut rt = runtime();
     if !rt.enabled {
+        rt.shift_pair.clear();
         return false;
     }
 
@@ -250,8 +271,80 @@ fn is_navigation(vk: u32) -> bool {
     NAV.contains(&(vk as u16)) || (0x70..=0x87).contains(&vk)
 }
 
+fn is_shift_vk(vk: u32) -> bool {
+    vk == VK_SHIFT.0 as u32 || vk == 0xA0 || vk == 0xA1
+}
+
 fn is_shift_or_caps(vk: u32) -> bool {
-    vk == VK_SHIFT.0 as u32 || vk == 0xA0 || vk == 0xA1 || vk == VK_CAPITAL.0 as u32
+    is_shift_vk(vk) || vk == VK_CAPITAL.0 as u32
+}
+
+/// Shift is forwarded either way. A repeat while it is held does not count,
+/// and the second Shift of a chord (left still down, right goes down) does
+/// not count either.
+fn handle_double_shift(vk: u32, is_up: bool) -> bool {
+    if is_up {
+        release_shift(&mut runtime(), vk);
+        return false;
+    }
+    let blocked = focus_is_password() || foreground_is_self();
+    let mut rt = runtime();
+    if shift_is_held(&rt, vk) {
+        return false;
+    }
+    let other = other_shift_held(&rt, vk);
+    press_shift(&mut rt, vk);
+    if blocked || !rt.enabled {
+        rt.shift_pair.clear();
+        if blocked {
+            rt.engine.forget();
+        }
+        return false;
+    }
+    if other {
+        rt.shift_pair.clear();
+        return false;
+    }
+    if rt.shift_pair.press(Instant::now()) {
+        let rewrite = rt.engine.force();
+        drop(rt);
+        if let Some(rewrite) = rewrite {
+            super::send::apply(rewrite);
+        }
+    }
+    false
+}
+
+fn shift_is_held(rt: &super::Runtime, vk: u32) -> bool {
+    match vk {
+        0xA0 => rt.shift_left,
+        0xA1 => rt.shift_right,
+        _ => rt.shift_either,
+    }
+}
+
+fn other_shift_held(rt: &super::Runtime, vk: u32) -> bool {
+    match vk {
+        0xA0 => rt.shift_right || rt.shift_either,
+        0xA1 => rt.shift_left || rt.shift_either,
+        _ => rt.shift_left || rt.shift_right,
+    }
+}
+
+fn press_shift(rt: &mut super::Runtime, vk: u32) {
+    match vk {
+        0xA0 => rt.shift_left = true,
+        0xA1 => rt.shift_right = true,
+        _ => rt.shift_either = true,
+    }
+}
+
+fn release_shift(rt: &mut super::Runtime, vk: u32) {
+    match vk {
+        0xA0 => rt.shift_left = false,
+        0xA1 => rt.shift_right = false,
+        _ => rt.shift_either = false,
+    }
 }
 
 fn is_chord(vk: u32) -> bool {
