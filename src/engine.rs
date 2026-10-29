@@ -18,8 +18,9 @@ pub struct Rewrite {
 
 struct Saved {
     original: String,
+    original_script: Script,
     inserted: String,
-    switched_to: Script,
+    inserted_script: Script,
     /// Mark as it was typed, in `term_script`. Space, Enter and Tab ignore it.
     term: Option<Term>,
     term_script: Script,
@@ -88,19 +89,19 @@ impl Engine {
             return None;
         }
         let change = autocorrect(&original, dict)?;
-        let typed_in = change.switch_to.other();
         let rewrite = Rewrite {
             delete: original.chars().count(),
             insert: change.text.clone(),
             switch_to: change.switch_to,
-            term: Some(present_term(term, typed_in, change.switch_to)),
+            term: Some(present_term(term, change.typed_in, change.switch_to)),
         };
         self.last = Some(Saved {
             original,
+            original_script: change.typed_in,
             inserted: change.text,
-            switched_to: change.switch_to,
+            inserted_script: change.switch_to,
             term: Some(term),
-            term_script: typed_in,
+            term_script: change.typed_in,
         });
         Some(rewrite)
     }
@@ -124,10 +125,11 @@ impl Engine {
         };
         self.last = Some(Saved {
             original,
+            original_script: change.typed_in,
             inserted: change.text,
-            switched_to: change.switch_to,
+            inserted_script: change.switch_to,
             term: None,
-            term_script: change.switch_to,
+            term_script: change.typed_in,
         });
         Some(rewrite)
     }
@@ -135,7 +137,7 @@ impl Engine {
     fn undo(&mut self) -> Option<Rewrite> {
         let saved = self.last.take()?;
         let term_len = usize::from(saved.term.is_some());
-        let switch_to = saved.switched_to.other();
+        let switch_to = saved.original_script;
         let rewrite = Rewrite {
             delete: saved.inserted.chars().count() + term_len,
             insert: saved.original.clone(),
@@ -146,8 +148,9 @@ impl Engine {
         };
         self.last = Some(Saved {
             original: saved.inserted,
+            original_script: saved.inserted_script,
             inserted: saved.original,
-            switched_to: rewrite.switch_to,
+            inserted_script: saved.original_script,
             term: saved.term,
             term_script: saved.term_script,
         });
@@ -251,6 +254,34 @@ mod tests {
         let third = engine.force().unwrap();
         assert_eq!(third.insert, "привет");
         assert_eq!(third.switch_to, Script::Ru);
+    }
+
+    #[test]
+    fn caps_lock_case_stays_on_the_same_layout() {
+        let dict = dict();
+        let mut engine = Engine::new();
+        type_word(&mut engine, "пРИВЕТ");
+        let rewrite = engine.end_word(Term::Space, &dict).unwrap();
+        assert_eq!(rewrite.delete, 6);
+        assert_eq!(rewrite.insert, "Привет");
+        assert_eq!(rewrite.switch_to, Script::Ru);
+        assert_eq!(rewrite.term, Some(Term::Space));
+
+        let undo = engine.force().unwrap();
+        assert_eq!(undo.insert, "пРИВЕТ");
+        assert_eq!(undo.switch_to, Script::Ru);
+        assert_eq!(undo.term, Some(Term::Space));
+
+        let again = engine.force().unwrap();
+        assert_eq!(again.insert, "Привет");
+        assert_eq!(again.switch_to, Script::Ru);
+
+        let mut engine = Engine::new();
+        type_word(&mut engine, "hELLO");
+        let rewrite = engine.end_word(Term::Mark(','), &dict).unwrap();
+        assert_eq!(rewrite.insert, "Hello");
+        assert_eq!(rewrite.switch_to, Script::En);
+        assert_eq!(rewrite.term, Some(Term::Mark(',')));
     }
 
     #[test]

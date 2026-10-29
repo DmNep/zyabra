@@ -4,7 +4,7 @@
 
 `ghbdtn` становится `привет`, `руддщ` становится `hello`.
 
-Скачать: [последний релиз](https://github.com/DmNep/zyabra/releases/latest) ([Windows](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.10.exe), [Linux x86_64](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.10-linux-x86_64)).
+Скачать: [последний релиз](https://github.com/DmNep/zyabra/releases/latest) ([Windows](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.11.exe), [Linux x86_64](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.11-linux-x86_64)).
 
 ## Что программа не делает
 
@@ -31,6 +31,8 @@
 ```
 
 Слово остаётся как есть, если оно есть в словаре текущей раскладки. Оно меняется, только если в своей раскладке его нет, а те же физические клавиши в другой раскладке дают словарное слово. Если не уверенно ни то ни другое, программа не трогает текст.
+
+Исключение одно: слово из словаря, набранное как одна строчная буква и дальше все прописные. Так выходит, когда Caps Lock включён и Shift зажат только на первой букве. Зябра переворачивает регистр и раскладку не меняет: `пРИВЕТ` становится `Привет`, `hELLO` — `Hello`. Целиком прописное слово и слово, где заглавные зашли дальше первой буквы, остаётся как набрано: `ПРИВЕТ`, `ПРивет`. `Pause` возвращает прежний регистр.
 
 Буква сопоставляется по клавише, а не по алфавиту: QWERTY ↔ ЙЦУКЕН. Запятая внутри `cj,frf` — это `б`, поэтому получается `собака`. Запятая после слова остаётся запятой: `ghbdtn,` → `привет,`.
 
@@ -78,7 +80,7 @@ cargo test
 cargo build --release
 ```
 
-Готовый файл Windows: `target/release/zyabra.exe`. В релизе он называется `zyabra-0.1.10.exe`: версия стоит после названия. Linux-файл в том же релизе называется `zyabra-0.1.10-linux-x86_64`. Подпись кода нет, SmartScreen может спросить подтверждение при первом запуске Windows-файла.
+Готовый файл Windows: `target/release/zyabra.exe`. В релизе он называется `zyabra-0.1.11.exe`: версия стоит после названия. Linux-файл в том же релизе называется `zyabra-0.1.11-linux-x86_64`. Подпись кода нет, SmartScreen может спросить подтверждение при первом запуске Windows-файла.
 
 ## Словари
 
@@ -102,7 +104,7 @@ cargo build --release
 
 ## English
 
-Zyabra is a local RU/EN layout switcher. A word typed in the wrong layout is rewritten and the layout flips. Pause toggles that same word on every press. Another key can be added at launch with `--key CODE`; `--key 2sh` converts on a second Shift press and still lets Shift type capitals. The window shows the name next to Pause, and Zyabra does not store the code. Short additions live in `dictionaries/extra-en.txt` and `dictionaries/extra-ru.txt` and are brought in by a commit; `...` is an English entry, so `ююю` is rewritten as `...`. The current word and that one replacement stay in memory. Nothing is written to disk, the clipboard is not used, and the program never opens a network connection.
+Zyabra is a local RU/EN layout switcher. A word typed in the wrong layout is rewritten and the layout flips. A dictionary word typed as one lowercase letter and then capitals (`hELLO`, `пРИВЕТ`) becomes `Hello` or `Привет` without a layout change; `HELLO` and `ПРивет` stay as typed. Pause toggles that same word on every press. Another key can be added at launch with `--key CODE`; `--key 2sh` converts on a second Shift press and still lets Shift type capitals. The window shows the name next to Pause, and Zyabra does not store the code. Short additions live in `dictionaries/extra-en.txt` and `dictionaries/extra-ru.txt` and are brought in by a commit; `...` is an English entry, so `ююю` is rewritten as `...`. The current word and that one replacement stay in memory. Nothing is written to disk, the clipboard is not used, and the program never opens a network connection.
 
 ## License
 
