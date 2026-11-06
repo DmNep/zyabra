@@ -12,6 +12,20 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test
 
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --locked
+      - run: cargo build --release --locked
+      - run: file target/release/zyabra
+      - run: target/release/zyabra --help
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zyabra-macos
+          path: target/release/zyabra
+
   offline:
     runs-on: ubuntu-latest
     steps:

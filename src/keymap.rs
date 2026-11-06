@@ -549,6 +549,87 @@ fn upper_char(ch: char) -> char {
     ch.to_uppercase().next().unwrap_or(ch)
 }
 
+/// macOS virtual keycode to the set-1 scan this table already uses.
+/// The positions are the ANSI US keyboard. ISO's extra key is not mapped.
+pub fn mac_keycode_to_scan(keycode: u16) -> Option<u16> {
+    const MAC_TO_SCAN: &[(u16, u16)] = &[
+        (0x0C, 0x10), // Q
+        (0x0D, 0x11), // W
+        (0x0E, 0x12), // E
+        (0x0F, 0x13), // R
+        (0x11, 0x14), // T
+        (0x10, 0x15), // Y
+        (0x20, 0x16), // U
+        (0x22, 0x17), // I
+        (0x1F, 0x18), // O
+        (0x23, 0x19), // P
+        (0x21, 0x1A), // [
+        (0x1E, 0x1B), // ]
+        (0x00, 0x1E), // A
+        (0x01, 0x1F), // S
+        (0x02, 0x20), // D
+        (0x03, 0x21), // F
+        (0x05, 0x22), // G
+        (0x04, 0x23), // H
+        (0x26, 0x24), // J
+        (0x28, 0x25), // K
+        (0x25, 0x26), // L
+        (0x29, 0x27), // ;
+        (0x27, 0x28), // '
+        (0x06, 0x2C), // Z
+        (0x07, 0x2D), // X
+        (0x08, 0x2E), // C
+        (0x09, 0x2F), // V
+        (0x0B, 0x30), // B
+        (0x2D, 0x31), // N
+        (0x2E, 0x32), // M
+        (0x2B, 0x33), // ,
+        (0x2F, 0x34), // .
+        (0x2C, 0x35), // /
+        (0x32, 0x29), // `
+        (0x2A, 0x2B), // \
+        (0x12, 0x02), // 1
+        (0x13, 0x03), // 2
+        (0x14, 0x04), // 3
+        (0x15, 0x05), // 4
+        (0x17, 0x06), // 5
+        (0x16, 0x07), // 6
+        (0x1A, 0x08), // 7
+        (0x1C, 0x09), // 8
+        (0x19, 0x0A), // 9
+        (0x1D, 0x0B), // 0
+        (0x1B, 0x0C), // -
+        (0x18, 0x0D), // =
+    ];
+    MAC_TO_SCAN
+        .iter()
+        .find(|(mac, _)| *mac == keycode)
+        .map(|(_, scan)| *scan)
+}
+
+/// Which enabled macOS input source to activate. Russian PC (`RussianWin`)
+/// matches the punctuation in this table; Apple's "Russian" does not.
+pub fn choose_layout_source<'a>(
+    sources: &'a [(&'a str, Script)],
+    script: Script,
+) -> Option<&'a str> {
+    let same: Vec<&str> = sources
+        .iter()
+        .filter(|(_, item)| *item == script)
+        .map(|(id, _)| *id)
+        .collect();
+    let prefer: &[&str] = match script {
+        Script::Ru => &["RussianWin", "RussianPC", "Russian"],
+        Script::En => &["US", "ABC", "British"],
+    };
+    for mark in prefer {
+        if let Some(id) = same.iter().copied().find(|id| id.contains(mark)) {
+            return Some(id);
+        }
+    }
+    same.first().copied()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -635,6 +716,56 @@ mod tests {
             KeyClass::Glyph('ё')
         );
         assert_eq!(classify(0x00, false, false, Script::En), KeyClass::Other);
+    }
+
+    #[test]
+    fn mac_keycodes_use_the_same_scans() {
+        let q = mac_keycode_to_scan(0x0C).unwrap();
+        assert_eq!(classify(q, false, false, Script::En), KeyClass::Glyph('q'));
+        assert_eq!(classify(q, false, false, Script::Ru), KeyClass::Glyph('й'));
+        let grave = mac_keycode_to_scan(0x32).unwrap();
+        assert_eq!(classify(grave, false, false, Script::Ru), KeyClass::Glyph('ё'));
+        let mut scans = [0u16; 64];
+        let mut count = 0;
+        for code in 0..128u16 {
+            if let Some(scan) = mac_keycode_to_scan(code) {
+                scans[count] = scan;
+                count += 1;
+            }
+        }
+        assert_eq!(count, 47);
+        for scan in [
+            0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x10, 0x11,
+            0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1E, 0x1F, 0x20, 0x21,
+            0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30,
+            0x31, 0x32, 0x33, 0x34, 0x35,
+        ] {
+            assert!(scans[..count].contains(&scan), "scan {scan:#x}");
+        }
+    }
+
+    #[test]
+    fn mac_source_prefers_the_pc_layout() {
+        let sources = [
+            ("com.apple.keylayout.Russian", Script::Ru),
+            ("com.apple.keylayout.RussianWin", Script::Ru),
+            ("com.apple.keylayout.ABC", Script::En),
+            ("com.apple.keylayout.US", Script::En),
+        ];
+        assert_eq!(
+            choose_layout_source(&sources, Script::Ru),
+            Some("com.apple.keylayout.RussianWin")
+        );
+        assert_eq!(
+            choose_layout_source(&sources, Script::En),
+            Some("com.apple.keylayout.US")
+        );
+        assert!(choose_layout_source(&sources[..1], Script::En).is_none());
+        let russian = [("com.apple.keylayout.Russian", Script::Ru)];
+        assert_eq!(
+            choose_layout_source(&russian, Script::Ru),
+            Some("com.apple.keylayout.Russian")
+        );
     }
 
     #[test]

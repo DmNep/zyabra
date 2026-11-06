@@ -71,6 +71,16 @@ cargo build --release --target x86_64-unknown-linux-gnu
 
 Кросс-сборка кладёт файл в `target/x86_64-unknown-linux-gnu/release/zyabra`. Окно закрывается крестиком, процесс после этого отпускает клавиатуру.
 
+## macOS
+
+Нужны две раскладки ввода: английская и русская. Буквы на них те же. Знаки препинания совпадают с этой программой на раскладке "Русская — ПК". Обычная "Русская" Apple для букв тоже годится.
+
+Зябра ставит фильтр клавиатуры. Система один раз спрашивает доступ. Если фильтр не встал: "Системные настройки → Конфиденциальность и безопасность → Универсальный доступ" и "Мониторинг ввода", включите Зябру и запустите её снова.
+
+Клавиши Pause на Маке нет. Слово исправляет кнопка "Исправить", второй Shift (`zyabra --key 2sh`) или своя клавиша (`zyabra --key 0x71` — F15). Поля пароля система закрывает, эти нажатия Зябра не видит. Крестик завершает программу и снимает фильтр.
+
+Сборка на самом Маке: `cargo build --release`. Файл будет `target/release/zyabra`. Подписи нет: при первом открытии система может отказаться запускать файл, пока его не подтвердят в настройках безопасности. Стенд GitHub собирает тот же файл на macOS и кладёт его в артефакт `zyabra-macos`.
+
 ## Сборка
 
 Нужен Rust.
@@ -104,7 +114,7 @@ cargo build --release
 
 ## English
 
-Zyabra is a local RU/EN layout switcher. A word typed in the wrong layout is rewritten and the layout flips. A dictionary word typed as one lowercase letter and then capitals (`hELLO`, `пРИВЕТ`) becomes `Hello` or `Привет` without a layout change; `HELLO` and `ПРивет` stay as typed. Pause toggles that same word on every press. Another key can be added at launch with `--key CODE`; `--key 2sh` converts on a second Shift press and still lets Shift type capitals. The window shows the name next to Pause, and Zyabra does not store the code. Short additions live in `dictionaries/extra-en.txt` and `dictionaries/extra-ru.txt` and are brought in by a commit; `...` is an English entry, so `ююю` is rewritten as `...`. The current word and that one replacement stay in memory. Nothing is written to disk, the clipboard is not used, and the program never opens a network connection.
+Zyabra is a local RU/EN layout switcher. A word typed in the wrong layout is rewritten and the layout flips. A dictionary word typed as one lowercase letter and then capitals (`hELLO`, `пРИВЕТ`) becomes `Hello` or `Привет` without a layout change; `HELLO` and `ПРивет` stay as typed. Pause toggles that same word on every press. Another key can be added at launch with `--key CODE`; `--key 2sh` converts on a second Shift press and still lets Shift type capitals. On macOS there is no Pause key: the Fix button, `--key 2sh`, or `--key 0x71` (F15) converts the word. The window shows the name next to Pause, and Zyabra does not store the code. Short additions live in `dictionaries/extra-en.txt` and `dictionaries/extra-ru.txt` and are brought in by a commit; `...` is an English entry, so `ююю` is rewritten as `...`. The current word and that one replacement stay in memory. Nothing is written to disk, the clipboard is not used, and the program never opens a network connection.
 
 ## License
 

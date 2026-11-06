@@ -13,9 +13,13 @@ flate2 = { version = "1", default-features = false, features = ["rust_backend"] 
 [build-dependencies]
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 
-[target.'cfg(unix)'.dependencies]
+[target.'cfg(target_os = "linux")'.dependencies]
 evdev = "0.13"
 x11rb = { version = "0.13", features = ["xkb"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"
+objc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61", features = [

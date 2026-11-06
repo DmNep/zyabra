@@ -1,12 +1,15 @@
-//! Tray program on Windows, evdev program on Linux. The library crate decides;
-//! this file only talks to the system. Typed text is never written anywhere.
+//! Tray program on Windows, evdev program on Linux, event tap on macOS.
+//! The library crate decides; this file only talks to the system.
+//! Typed text is never written anywhere.
 
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 #[cfg(windows)]
 mod win;
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 mod linux;
+#[cfg(target_os = "macos")]
+mod mac;
 
 fn main() {
     let force_key = match zyabra::parse_args(std::env::args().skip(1)) {
@@ -26,16 +29,23 @@ fn main() {
             win::report_error(&err);
         }
     }
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     {
         if let Err(err) = linux::run(force_key) {
             eprintln!("Зябра: {err}");
             std::process::exit(1);
         }
     }
-    #[cfg(not(any(windows, unix)))]
+    #[cfg(target_os = "macos")]
     {
-        eprintln!("Зябра работает только в Windows и Linux.");
+        if let Err(err) = mac::run(force_key) {
+            eprintln!("Зябра: {err}");
+            std::process::exit(1);
+        }
+    }
+    #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
+    {
+        eprintln!("Зябра работает только в Windows, Linux и macOS.");
         std::process::exit(1);
     }
 }

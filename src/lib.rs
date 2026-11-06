@@ -16,4 +16,6 @@ pub use shiftpair::{ShiftPair, DOUBLE_SHIFT_GAP};
 pub use decide::{autocorrect, force_convert, Change};
 pub use dict::{HasWords, MapDict, StaticDict};
 pub use engine::{Engine, Rewrite};
-pub use keymap::{chord_for, classify, Chord, KeyClass, Script, Term};
+pub use keymap::{
+    choose_layout_source, chord_for, classify, mac_keycode_to_scan, Chord, KeyClass, Script, Term,
+};
