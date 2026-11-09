@@ -1,6 +1,6 @@
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE,
-    VIRTUAL_KEY, VK_RETURN, VK_TAB,
+    GetKeyState, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
+    KEYEVENTF_UNICODE, VIRTUAL_KEY, VK_CAPITAL, VK_RETURN, VK_TAB,
 };
 
 use zyabra::Term;
@@ -14,6 +14,16 @@ pub(super) fn apply(rewrite: zyabra::Rewrite) {
         send_term(term);
     }
     super::switch_layout(rewrite.switch_to);
+    if let Some(on) = rewrite.caps {
+        set_caps(on);
+    }
+}
+
+fn set_caps(on: bool) {
+    let lit = unsafe { GetKeyState(VK_CAPITAL.0 as i32) } & 1 != 0;
+    if lit != on {
+        send_vk(VK_CAPITAL);
+    }
 }
 
 fn send_term(term: Term) {

@@ -8,6 +8,8 @@ pub struct Change {
     pub typed_in: Script,
     /// Layout to leave active. Same as `typed_in` when only the case changes.
     pub switch_to: Script,
+    /// Caps Lock produced this shape (`пРИВЕТ`). The platform releases it.
+    pub release_caps: bool,
 }
 
 /// Correct `word` when it is not a word in its own script but the same
@@ -45,6 +47,7 @@ pub fn autocorrect(word: &str, dict: &impl HasWords) -> Option<Change> {
                     text,
                     typed_in: script,
                     switch_to: script.other(),
+                    release_caps: false,
                 });
             }
         }
@@ -84,6 +87,7 @@ pub fn force_convert(word: &str) -> Option<Change> {
         text,
         typed_in: script,
         switch_to: script.other(),
+        release_caps: false,
     })
 }
 
@@ -97,6 +101,7 @@ fn fix_caps_lock(script: Script, stem: &str, tail: &[char]) -> Option<Change> {
         text,
         typed_in: script,
         switch_to: script,
+        release_caps: true,
     })
 }
 
@@ -183,6 +188,8 @@ mod tests {
         assert_eq!(ru.text, "Привет");
         assert_eq!(ru.typed_in, Script::Ru);
         assert_eq!(ru.switch_to, Script::Ru);
+        assert!(ru.release_caps);
+        assert!(!autocorrect("ghbdtn", &dict).unwrap().release_caps);
         assert_eq!(autocorrect("пРИВЕТ,", &dict).unwrap().text, "Привет,");
 
         let en = autocorrect("hELLO", &dict).unwrap();

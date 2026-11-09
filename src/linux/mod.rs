@@ -306,6 +306,11 @@ fn apply(app: &mut App, rewrite: Rewrite) -> Result<(), String> {
 }
 
 fn type_rewrite(app: &mut App, rewrite: &Rewrite) -> Result<(), String> {
+    if rewrite.caps.is_some() {
+        // Letters are injected as key codes. Caps Lock would invert them, so
+        // it is off while the word is typed and restored afterwards.
+        sync_caps(app, false)?;
+    }
     for _ in 0..rewrite.delete {
         app.keys.tap(KeyCode::KEY_BACKSPACE.0, false)?;
     }
@@ -314,6 +319,18 @@ fn type_rewrite(app: &mut App, rewrite: &Rewrite) -> Result<(), String> {
     if let Some(term) = rewrite.term {
         type_term(&mut app.keys, rewrite.switch_to, term)?;
     }
+    if let Some(on) = rewrite.caps {
+        sync_caps(app, on)?;
+    }
+    Ok(())
+}
+
+fn sync_caps(app: &mut App, on: bool) -> Result<(), String> {
+    if app.caps == on {
+        return Ok(());
+    }
+    app.keys.tap(KeyCode::KEY_CAPSLOCK.0, false)?;
+    app.caps = on;
     Ok(())
 }
 

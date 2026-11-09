@@ -96,6 +96,7 @@ extern "C" {
     fn CGEventTapEnable(tap: *mut c_void, enable: bool);
     fn CGEventGetIntegerValueField(event: *mut c_void, field: u32) -> i64;
     fn CGEventGetFlags(event: *mut c_void) -> u64;
+    fn CGEventSourceFlagsState(state: i32) -> u64;
     fn CGEventSetFlags(event: *mut c_void, flags: u64);
     fn CGEventSetIntegerValueField(event: *mut c_void, field: u32, value: i64);
     fn CGEventSourceCreate(state: i32) -> *mut c_void;
@@ -690,8 +691,36 @@ fn apply(rewrite: Rewrite) {
             Term::Mark(ch) => post_char(ch),
         }
     }
+    if let Some(on) = rewrite.caps {
+        set_caps(on);
+    }
     INJECTING.store(false, Ordering::SeqCst);
     switch_to(rewrite.switch_to);
+}
+
+fn set_caps(on: bool) {
+    let lit = unsafe { (CGEventSourceFlagsState(1) & FLAG_CAPS) != 0 };
+    if lit != on {
+        post_caps_toggle();
+    }
+}
+
+fn post_caps_toggle() {
+    let source = event_source();
+    if source.is_null() {
+        return;
+    }
+    for down in [true, false] {
+        unsafe {
+            let event = CGEventCreateKeyboardEvent(source, KEY_CAPS, down);
+            if event.is_null() {
+                continue;
+            }
+            CGEventSetIntegerValueField(event, FIELD_USER_DATA, MAGIC);
+            CGEventPost(0, event);
+            CFRelease(event);
+        }
+    }
 }
 
 fn post_char(ch: char) {

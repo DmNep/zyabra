@@ -14,6 +14,10 @@ pub struct Rewrite {
     /// A mark is the other layout's character of the same key (`&` → `?`).
     /// `None` for a manual conversion that had no terminator.
     pub term: Option<Term>,
+    /// Caps Lock to leave behind. `Some(false)` releases it after `пРИВЕТ` →
+    /// `Привет`. `Some(true)` puts it back when that word is restored.
+    /// `None` leaves the key alone.
+    pub caps: Option<bool>,
 }
 
 struct Saved {
@@ -24,6 +28,8 @@ struct Saved {
     /// Mark as it was typed, in `term_script`. Space, Enter and Tab ignore it.
     term: Option<Term>,
     term_script: Script,
+    original_caps: Option<bool>,
+    inserted_caps: Option<bool>,
 }
 
 pub struct Engine {
@@ -89,11 +95,13 @@ impl Engine {
             return None;
         }
         let change = autocorrect(&original, dict)?;
+        let caps = change.release_caps.then_some(false);
         let rewrite = Rewrite {
             delete: original.chars().count(),
             insert: change.text.clone(),
             switch_to: change.switch_to,
             term: Some(present_term(term, change.typed_in, change.switch_to)),
+            caps,
         };
         self.last = Some(Saved {
             original,
@@ -102,6 +110,8 @@ impl Engine {
             inserted_script: change.switch_to,
             term: Some(term),
             term_script: change.typed_in,
+            original_caps: change.release_caps.then_some(true),
+            inserted_caps: caps,
         });
         Some(rewrite)
     }
@@ -122,6 +132,7 @@ impl Engine {
             insert: change.text.clone(),
             switch_to: change.switch_to,
             term: None,
+            caps: None,
         };
         self.last = Some(Saved {
             original,
@@ -130,6 +141,8 @@ impl Engine {
             inserted_script: change.switch_to,
             term: None,
             term_script: change.typed_in,
+            original_caps: None,
+            inserted_caps: None,
         });
         Some(rewrite)
     }
@@ -145,6 +158,7 @@ impl Engine {
             term: saved
                 .term
                 .map(|term| present_term(term, saved.term_script, switch_to)),
+            caps: saved.original_caps,
         };
         self.last = Some(Saved {
             original: saved.inserted,
@@ -153,6 +167,8 @@ impl Engine {
             inserted_script: saved.original_script,
             term: saved.term,
             term_script: saved.term_script,
+            original_caps: saved.inserted_caps,
+            inserted_caps: saved.original_caps,
         });
         Some(rewrite)
     }
@@ -245,6 +261,7 @@ mod tests {
         assert_eq!(first.insert, "привет");
         assert_eq!(first.switch_to, Script::Ru);
         assert_eq!(first.term, None);
+        assert_eq!(first.caps, None);
 
         let second = engine.force().unwrap();
         assert_eq!(second.delete, "привет".chars().count());
@@ -266,15 +283,18 @@ mod tests {
         assert_eq!(rewrite.insert, "Привет");
         assert_eq!(rewrite.switch_to, Script::Ru);
         assert_eq!(rewrite.term, Some(Term::Space));
+        assert_eq!(rewrite.caps, Some(false));
 
         let undo = engine.force().unwrap();
         assert_eq!(undo.insert, "пРИВЕТ");
         assert_eq!(undo.switch_to, Script::Ru);
         assert_eq!(undo.term, Some(Term::Space));
+        assert_eq!(undo.caps, Some(true));
 
         let again = engine.force().unwrap();
         assert_eq!(again.insert, "Привет");
         assert_eq!(again.switch_to, Script::Ru);
+        assert_eq!(again.caps, Some(false));
 
         let mut engine = Engine::new();
         type_word(&mut engine, "hELLO");

@@ -32,7 +32,7 @@
 
 Слово остаётся как есть, если оно есть в словаре текущей раскладки. Оно меняется, только если в своей раскладке его нет, а те же физические клавиши в другой раскладке дают словарное слово. Если не уверенно ни то ни другое, программа не трогает текст.
 
-Исключение одно: слово из словаря, набранное как одна строчная буква и дальше все прописные. Так выходит, когда Caps Lock включён и Shift зажат только на первой букве. Зябра переворачивает регистр и раскладку не меняет: `пРИВЕТ` становится `Привет`, `hELLO` — `Hello`. Целиком прописное слово и слово, где заглавные зашли дальше первой буквы, остаётся как набрано: `ПРИВЕТ`, `ПРивет`. `Pause` возвращает прежний регистр.
+Исключение одно: слово из словаря, набранное как одна строчная буква и дальше все прописные. Так выходит, когда Caps Lock включён и Shift зажат только на первой букве. Зябра переворачивает регистр, отпускает Caps Lock и раскладку не меняет: `пРИВЕТ` становится `Привет`, `hELLO` — `Hello`, следующее слово пишется строчными. Целиком прописное слово и слово, где заглавные зашли дальше первой буквы, остаётся как набрано: `ПРИВЕТ`, `ПРивет`. `Pause` возвращает прежний регистр и снова включает Caps Lock.
 
 Буква сопоставляется по клавише, а не по алфавиту: QWERTY ↔ ЙЦУКЕН. Запятая внутри `cj,frf` — это `б`, поэтому получается `собака`. Запятая после слова остаётся запятой: `ghbdtn,` → `привет,`.
 
@@ -114,7 +114,7 @@ cargo build --release
 
 ## English
 
-Zyabra is a local RU/EN layout switcher. A word typed in the wrong layout is rewritten and the layout flips. A dictionary word typed as one lowercase letter and then capitals (`hELLO`, `пРИВЕТ`) becomes `Hello` or `Привет` without a layout change; `HELLO` and `ПРивет` stay as typed. Pause toggles that same word on every press. Another key can be added at launch with `--key CODE`; `--key 2sh` converts on a second Shift press and still lets Shift type capitals. On macOS there is no Pause key: the Fix button, `--key 2sh`, or `--key 0x71` (F15) converts the word. The window shows the name next to Pause, and Zyabra does not store the code. Short additions live in `dictionaries/extra-en.txt` and `dictionaries/extra-ru.txt` and are brought in by a commit; `...` is an English entry, so `ююю` is rewritten as `...`. The current word and that one replacement stay in memory. Nothing is written to disk, the clipboard is not used, and the program never opens a network connection.
+Zyabra is a local RU/EN layout switcher. A word typed in the wrong layout is rewritten and the layout flips. A dictionary word typed as one lowercase letter and then capitals (`hELLO`, `пРИВЕТ`) becomes `Hello` or `Привет` without a layout change, and Caps Lock is released so the next word is lowercase; `HELLO` and `ПРивет` stay as typed. Pause restores the previous case and Caps Lock. Pause toggles that same word on every press. Another key can be added at launch with `--key CODE`; `--key 2sh` converts on a second Shift press and still lets Shift type capitals. On macOS there is no Pause key: the Fix button, `--key 2sh`, or `--key 0x71` (F15) converts the word. The window shows the name next to Pause, and Zyabra does not store the code. Short additions live in `dictionaries/extra-en.txt` and `dictionaries/extra-ru.txt` and are brought in by a commit; `...` is an English entry, so `ююю` is rewritten as `...`. The current word and that one replacement stay in memory. Nothing is written to disk, the clipboard is not used, and the program never opens a network connection.
 
 ## License
 
