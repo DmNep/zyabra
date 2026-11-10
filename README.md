@@ -1,10 +1,10 @@
 # Зябра
 
-Локальный переключатель раскладки для Windows и Linux. Если слово набрано не в той раскладке, Зябра стирает его и пишет заново в правильной, затем переключает раскладку.
+Локальный переключатель раскладки для Windows, Linux и macOS. Если слово набрано не в той раскладке, Зябра стирает его и пишет заново в правильной, затем переключает раскладку.
 
 `ghbdtn` становится `привет`, `руддщ` становится `hello`.
 
-Скачать: [последний релиз](https://github.com/DmNep/zyabra/releases/latest) ([Windows](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.11.exe), [Linux x86_64](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.11-linux-x86_64)).
+Скачать: [последний релиз](https://github.com/DmNep/zyabra/releases/latest) ([Windows](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.12.exe), [Linux x86_64](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.12-linux-x86_64), [macOS Apple Silicon](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.12-macos-aarch64)).
 
 ## Что программа не делает
 
@@ -36,7 +36,7 @@
 
 Буква сопоставляется по клавише, а не по алфавиту: QWERTY ↔ ЙЦУКЕН. Запятая внутри `cj,frf` — это `б`, поэтому получается `собака`. Запятая после слова остаётся запятой: `ghbdtn,` → `привет,`.
 
-Решение живёт в библиотеке без ввода-вывода (`src/decide.rs`, `src/engine.rs`). Код системы только читает клавиши и печатает замену. На Windows это хук, на Linux — захват `/dev/input` и виртуальная клавиатура. Словари вшиты в программу.
+Решение живёт в библиотеке без ввода-вывода (`src/decide.rs`, `src/engine.rs`). Код системы только читает клавиши и печатает замену. На Windows это хук, на Linux — захват `/dev/input` и виртуальная клавиатура, на macOS — фильтр событий. Словари вшиты в программу.
 
 ## Управление
 
@@ -79,7 +79,7 @@ cargo build --release --target x86_64-unknown-linux-gnu
 
 Клавиши Pause на Маке нет. Слово исправляет кнопка "Исправить", второй Shift (`zyabra --key 2sh`) или своя клавиша (`zyabra --key 0x71` — F15). Поля пароля система закрывает, эти нажатия Зябра не видит. Крестик завершает программу и снимает фильтр.
 
-Сборка на самом Маке: `cargo build --release`. Файл будет `target/release/zyabra`. Подписи нет: при первом открытии система может отказаться запускать файл, пока его не подтвердят в настройках безопасности. Стенд GitHub собирает тот же файл на macOS и кладёт его в артефакт `zyabra-macos`.
+Сборка на самом Маке: `cargo build --release`. Файл будет `target/release/zyabra`. В релизе он называется `zyabra-0.1.12-macos-aarch64`: это Apple Silicon. Подписи нет: при первом открытии система может отказаться запускать файл, пока его не подтвердят в настройках безопасности.
 
 ## Сборка
 
@@ -90,7 +90,7 @@ cargo test
 cargo build --release
 ```
 
-Готовый файл Windows: `target/release/zyabra.exe`. В релизе он называется `zyabra-0.1.11.exe`: версия стоит после названия. Linux-файл в том же релизе называется `zyabra-0.1.11-linux-x86_64`. Подпись кода нет, SmartScreen может спросить подтверждение при первом запуске Windows-файла.
+Готовый файл Windows: `target/release/zyabra.exe`. В релизе он называется `zyabra-0.1.12.exe`: версия стоит после названия. Linux-файл в том же релизе называется `zyabra-0.1.12-linux-x86_64`, файл macOS — `zyabra-0.1.12-macos-aarch64`. Подпись кода нет, SmartScreen может спросить подтверждение при первом запуске Windows-файла.
 
 ## Словари
 
@@ -114,7 +114,7 @@ cargo build --release
 
 ## English
 
-Zyabra is a local RU/EN layout switcher. A word typed in the wrong layout is rewritten and the layout flips. A dictionary word typed as one lowercase letter and then capitals (`hELLO`, `пРИВЕТ`) becomes `Hello` or `Привет` without a layout change, and Caps Lock is released so the next word is lowercase; `HELLO` and `ПРивет` stay as typed. Pause restores the previous case and Caps Lock. Pause toggles that same word on every press. Another key can be added at launch with `--key CODE`; `--key 2sh` converts on a second Shift press and still lets Shift type capitals. On macOS there is no Pause key: the Fix button, `--key 2sh`, or `--key 0x71` (F15) converts the word. The window shows the name next to Pause, and Zyabra does not store the code. Short additions live in `dictionaries/extra-en.txt` and `dictionaries/extra-ru.txt` and are brought in by a commit; `...` is an English entry, so `ююю` is rewritten as `...`. The current word and that one replacement stay in memory. Nothing is written to disk, the clipboard is not used, and the program never opens a network connection.
+Zyabra is a local RU/EN layout switcher for Windows, Linux, and macOS. A word typed in the wrong layout is rewritten and the layout flips. A dictionary word typed as one lowercase letter and then capitals (`hELLO`, `пРИВЕТ`) becomes `Hello` or `Привет` without a layout change, and Caps Lock is released so the next word is lowercase; `HELLO` and `ПРивет` stay as typed. Pause restores the previous case and Caps Lock. Pause toggles that same word on every press. Another key can be added at launch with `--key CODE`; `--key 2sh` converts on a second Shift press and still lets Shift type capitals. On macOS there is no Pause key: the Fix button, `--key 2sh`, or `--key 0x71` (F15) converts the word. The window shows the name next to Pause, and Zyabra does not store the code. Short additions live in `dictionaries/extra-en.txt` and `dictionaries/extra-ru.txt` and are brought in by a commit; `...` is an English entry, so `ююю` is rewritten as `...`. The current word and that one replacement stay in memory. Nothing is written to disk, the clipboard is not used, and the program never opens a network connection.
 
 ## License
 
