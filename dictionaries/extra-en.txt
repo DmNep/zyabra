@@ -1,3 +1,43 @@
 # Добавки к английскому списку. Одна строка — одно слово строчными буквами, от 2 до 20 знаков.
 # Одни точки тоже можно: клавиша "ю" по-английски печатает точку.
 ...
+# git: команды и имена, которых нет в общем списке.
+autosquash
+autostash
+bitbucket
+bugfix
+config
+diff
+difftool
+fixup
+fsck
+gitattributes
+gitconfig
+gitea
+github
+gitignore
+gitkeep
+gitlab
+gitmodules
+gitk
+gpg
+grep
+gui
+hotfix
+init
+mergetool
+mv
+rebase
+reflog
+rerere
+rm
+shortlog
+signoff
+submodule
+submodules
+subtree
+untracked
+unstaged
+wip
+worktree
+worktrees

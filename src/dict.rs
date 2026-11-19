@@ -41,14 +41,17 @@ pub struct StaticDict {
 impl StaticDict {
     pub fn load() -> Self {
         let mut en = collect(inflate(include_bytes!(concat!(env!("OUT_DIR"), "/en.txt.gz"))), is_en_word);
-        let mut ru = collect(inflate(include_bytes!(concat!(env!("OUT_DIR"), "/ru.txt.gz"))), is_ru_word);
+        let mut ru = collect(
+            inflate(include_bytes!(concat!(env!("OUT_DIR"), "/ru.txt.gz"))),
+            is_shipped_ru,
+        );
         en.extend(load_extra(
             include_str!("../dictionaries/extra-en.txt"),
             is_extra_en,
         ));
         ru.extend(load_extra(
             include_str!("../dictionaries/extra-ru.txt"),
-            is_ru_word,
+            is_shipped_ru,
         ));
         en.sort_unstable();
         en.dedup();
@@ -119,6 +122,26 @@ fn is_extra_en(word: &str) -> bool {
 fn is_ru_word(word: &str) -> bool {
     let len = word.chars().count();
     (2..=20).contains(&len) && word.chars().all(|ch| ('а'..='я').contains(&ch))
+}
+
+fn is_shipped_ru(word: &str) -> bool {
+    is_ru_word(word) && !is_dropped_ru(word)
+}
+
+fn is_dropped_ru(word: &str) -> bool {
+    use std::sync::OnceLock;
+    static DROPPED: OnceLock<Vec<&str>> = OnceLock::new();
+    let dropped = DROPPED.get_or_init(|| {
+        let mut words: Vec<&str> = include_str!("../dictionaries/drop-ru.txt")
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with('#'))
+            .collect();
+        words.sort_unstable();
+        words.dedup();
+        words
+    });
+    dropped.binary_search(&word).is_ok()
 }
 
 pub fn normalize(word: &str) -> String {

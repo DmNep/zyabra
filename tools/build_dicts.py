@@ -23,11 +23,24 @@ def english_words() -> set[str]:
     return words
 
 
+def dropped_ru() -> set[str]:
+    path = OUT / "drop-ru.txt"
+    words: set[str] = set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        word = line.strip().lower().replace("ё", "е")
+        if word and not word.startswith("#"):
+            words.add(word)
+    return words
+
+
 def russian_words() -> set[str]:
     text = (THIRD / "russian-cp1251.txt").read_bytes().decode("cp1251")
+    skip = dropped_ru()
     words: set[str] = set()
     for line in text.splitlines():
         word = line.strip().lower().replace("ё", "е")
+        if word in skip:
+            continue
         if 2 <= len(word) <= 20 and all("а" <= ch <= "я" for ch in word):
             words.add(word)
     return words

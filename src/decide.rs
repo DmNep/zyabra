@@ -253,6 +253,11 @@ mod tests {
         assert!(autocorrect("ПРивет", &dict).is_none());
         assert!(autocorrect("the", &dict).is_none());
         assert!(autocorrect("собака", &dict).is_none());
+        assert_eq!(autocorrect("пше", &dict).unwrap().text, "git");
+        assert_eq!(autocorrect("вшаа", &dict).unwrap().text, "diff");
+        assert_eq!(autocorrect("кь", &dict).unwrap().text, "rm");
+        assert_eq!(autocorrect("згдд", &dict).unwrap().text, "pull");
+        assert!(!dict.has(Script::Ru, "пше"));
         assert!(dict.has(Script::En, "..."));
         let dots = autocorrect("ююю", &dict).unwrap();
         assert_eq!(dots.text, "...");

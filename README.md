@@ -4,7 +4,7 @@
 
 `ghbdtn` становится `привет`, `руддщ` становится `hello`.
 
-Скачать: [последний релиз](https://github.com/DmNep/zyabra/releases/latest) ([Windows](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.12.exe), [Linux x86_64](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.12-linux-x86_64), [macOS Apple Silicon](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.12-macos-aarch64)).
+Скачать: [последний релиз](https://github.com/DmNep/zyabra/releases/latest) ([Windows](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.13.exe), [Linux x86_64](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.13-linux-x86_64), [macOS Apple Silicon](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.13-macos-aarch64)).
 
 ## Что программа не делает
 
@@ -79,7 +79,7 @@ cargo build --release --target x86_64-unknown-linux-gnu
 
 Клавиши Pause на Маке нет. Слово исправляет кнопка "Исправить", второй Shift (`zyabra --key 2sh`) или своя клавиша (`zyabra --key 0x71` — F15). Поля пароля система закрывает, эти нажатия Зябра не видит. Крестик завершает программу и снимает фильтр.
 
-Сборка на самом Маке: `cargo build --release`. Файл будет `target/release/zyabra`. В релизе он называется `zyabra-0.1.12-macos-aarch64`: это Apple Silicon. Подписи нет: при первом открытии система может отказаться запускать файл, пока его не подтвердят в настройках безопасности.
+Сборка на самом Маке: `cargo build --release`. Файл будет `target/release/zyabra`. В релизе он называется `zyabra-0.1.13-macos-aarch64`: это Apple Silicon. Подписи нет: при первом открытии система может отказаться запускать файл, пока его не подтвердят в настройках безопасности.
 
 ## Сборка
 
@@ -90,7 +90,7 @@ cargo test
 cargo build --release
 ```
 
-Готовый файл Windows: `target/release/zyabra.exe`. В релизе он называется `zyabra-0.1.12.exe`: версия стоит после названия. Linux-файл в том же релизе называется `zyabra-0.1.12-linux-x86_64`, файл macOS — `zyabra-0.1.12-macos-aarch64`. Подпись кода нет, SmartScreen может спросить подтверждение при первом запуске Windows-файла.
+Готовый файл Windows: `target/release/zyabra.exe`. В релизе он называется `zyabra-0.1.13.exe`: версия стоит после названия. Linux-файл в том же релизе называется `zyabra-0.1.13-linux-x86_64`, файл macOS — `zyabra-0.1.13-macos-aarch64`. Подпись кода нет, SmartScreen может спросить подтверждение при первом запуске Windows-файла.
 
 ## Словари
 
@@ -98,7 +98,7 @@ cargo build --release
 
 `tools/build_dicts.py` заново собирает `dictionaries/en.txt` и `dictionaries/ru.txt` из уже скачанных файлов в `third_party/`. Программа этот скрипт не запускает. В файл Зябры списки попадают сжатыми и разворачиваются в памяти при запуске.
 
-Короткие добавки лежат отдельно: `dictionaries/extra-en.txt` и `dictionaries/extra-ru.txt`. Скрипт их не перезаписывает. Новое слово добавляется коммитом в репозиторий и попадает в программу при следующей сборке. Уже собранный файл строку сам не подхватывает.
+Короткие добавки лежат отдельно: `dictionaries/extra-en.txt` и `dictionaries/extra-ru.txt`. Скрипт их не перезаписывает. Новое слово добавляется коммитом в репозиторий и попадает в программу при следующей сборке. Уже собранный файл строку сам не подхватывает. `dictionaries/drop-ru.txt` вычёркивает обрывок из русского списка, если из-за него не перекладывается английское слово.
 
 В строке пишется слово того языка, которым оно является: строчными буквами, от 2 до 20 знаков. Пар словарь не хранит. Набранное меняется, только когда в своём списке его нет, а те же клавиши есть в другом. В английском списке есть `...`, поэтому `ююю` становится `...`: три "ю" по-русски словом не считаются, а эта клавиша по-английски печатает точку. В русский список добавляют слово, которого нет среди словоформ. Тогда набранное по-русски остаётся, а английские клавиши этого слова перекладываются в него, если сами словом не являются. Буква ё в строке пишется как е.
 
@@ -114,7 +114,7 @@ cargo build --release
 
 ## English
 
-Zyabra is a local RU/EN layout switcher for Windows, Linux, and macOS. A word typed in the wrong layout is rewritten and the layout flips. A dictionary word typed as one lowercase letter and then capitals (`hELLO`, `пРИВЕТ`) becomes `Hello` or `Привет` without a layout change, and Caps Lock is released so the next word is lowercase; `HELLO` and `ПРивет` stay as typed. Pause restores the previous case and Caps Lock. Pause toggles that same word on every press. Another key can be added at launch with `--key CODE`; `--key 2sh` converts on a second Shift press and still lets Shift type capitals. On macOS there is no Pause key: the Fix button, `--key 2sh`, or `--key 0x71` (F15) converts the word. The window shows the name next to Pause, and Zyabra does not store the code. Short additions live in `dictionaries/extra-en.txt` and `dictionaries/extra-ru.txt` and are brought in by a commit; `...` is an English entry, so `ююю` is rewritten as `...`. The current word and that one replacement stay in memory. Nothing is written to disk, the clipboard is not used, and the program never opens a network connection.
+Zyabra is a local RU/EN layout switcher for Windows, Linux, and macOS. A word typed in the wrong layout is rewritten and the layout flips. A dictionary word typed as one lowercase letter and then capitals (`hELLO`, `пРИВЕТ`) becomes `Hello` or `Привет` without a layout change, and Caps Lock is released so the next word is lowercase; `HELLO` and `ПРивет` stay as typed. Pause restores the previous case and Caps Lock. Pause toggles that same word on every press. Another key can be added at launch with `--key CODE`; `--key 2sh` converts on a second Shift press and still lets Shift type capitals. On macOS there is no Pause key: the Fix button, `--key 2sh`, or `--key 0x71` (F15) converts the word. The window shows the name next to Pause, and Zyabra does not store the code. Short additions live in `dictionaries/extra-en.txt` and `dictionaries/extra-ru.txt` and are brought in by a commit; `dictionaries/drop-ru.txt` drops a Russian fragment that blocks an English word; `...` is an English entry, so `ююю` is rewritten as `...`. The current word and that one replacement stay in memory. Nothing is written to disk, the clipboard is not used, and the program never opens a network connection.
 
 ## License
 
