@@ -41,7 +41,7 @@ pub fn autocorrect(word: &str, dict: &impl HasWords) -> Option<Change> {
         }
         if let Some(converted) = transpose(script, &stem) {
             if dict.has(script.other(), &normalize(&converted)) {
-                let mut text = converted;
+                let mut text = drop_stuck_shift(&converted);
                 text.extend(chars[end..].iter().copied());
                 return Some(Change {
                     text,
@@ -81,7 +81,7 @@ pub fn force_convert(word: &str) -> Option<Change> {
     if converted == stem {
         return None;
     }
-    let mut text = converted;
+    let mut text = drop_stuck_shift(&converted);
     text.extend(chars[end..].iter().copied());
     Some(Change {
         text,
@@ -124,6 +124,41 @@ fn invert_caps_lock(stem: &str) -> Option<String> {
     rest.then_some(out)
 }
 
+/// Shift held one key too long: `GHjljk;ftv` → `Продолжаем`.
+/// All capitals stay capitals. A capital later in the word stays too.
+fn drop_stuck_shift(text: &str) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let mut letters = chars.iter().enumerate().filter(|(_, ch)| ch.is_alphabetic());
+    let Some((_, first)) = letters.next() else {
+        return text.to_string();
+    };
+    let Some((second_at, second)) = letters.next() else {
+        return text.to_string();
+    };
+    if !first.is_uppercase() || !second.is_uppercase() {
+        return text.to_string();
+    }
+    let mut lowered = false;
+    for (_, ch) in letters {
+        if !ch.is_lowercase() {
+            return text.to_string();
+        }
+        lowered = true;
+    }
+    if !lowered {
+        return text.to_string();
+    }
+    let mut out = String::with_capacity(text.len());
+    for (index, ch) in chars.into_iter().enumerate() {
+        if index == second_at {
+            out.extend(ch.to_lowercase());
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
 fn letter_count(word: &str) -> usize {
     word.chars().filter(|ch| ch.is_alphabetic()).count()
 }
@@ -159,6 +194,17 @@ mod tests {
         assert_eq!(autocorrect("руддщ", &dict).unwrap().text, "hello");
         assert_eq!(autocorrect("jy", &dict).unwrap().text, "он");
         assert_eq!(autocorrect("xnj", &dict).unwrap().text, "что");
+    }
+
+    #[test]
+    fn stuck_shift_on_the_second_letter_becomes_one_capital() {
+        let dict = MapDict::new(&[], &["продолжаем", "привет", "собака"]);
+        assert_eq!(autocorrect("GHjljk;ftv", &dict).unwrap().text, "Продолжаем");
+        assert_eq!(autocorrect("GHbdtn", &dict).unwrap().text, "Привет");
+        assert_eq!(autocorrect("CJ,frf", &dict).unwrap().text, "Собака");
+        assert_eq!(autocorrect("GHBDTN", &dict).unwrap().text, "ПРИВЕТ");
+        assert_eq!(autocorrect("GhBdtn", &dict).unwrap().text, "ПрИвет");
+        assert_eq!(force_convert("GHjljk;ftv").unwrap().text, "Продолжаем");
     }
 
     #[test]
