@@ -4,7 +4,7 @@
 
 `ghbdtn` становится `привет`, `руддщ` становится `hello`.
 
-Скачать: [последний релиз](https://github.com/DmNep/zyabra/releases/latest) ([Windows](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.13.exe), [Linux x86_64](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.13-linux-x86_64), [macOS Apple Silicon](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.13-macos-aarch64)).
+Скачать: [последний релиз](https://github.com/DmNep/zyabra/releases/latest) ([Windows](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.14.exe), [Linux x86_64](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.14-linux-x86_64), [macOS Apple Silicon](https://github.com/DmNep/zyabra/releases/latest/download/zyabra-0.1.14-macos-aarch64)).
 
 ## Что программа не делает
 
@@ -81,7 +81,7 @@ cargo build --release --target x86_64-unknown-linux-gnu
 
 Клавиши Pause на Маке нет. Слово исправляет кнопка "Исправить", второй Shift (`zyabra --key 2sh`) или своя клавиша (`zyabra --key 0x71` — F15). Поля пароля система закрывает, эти нажатия Зябра не видит. Крестик завершает программу и снимает фильтр.
 
-Сборка на самом Маке: `cargo build --release`. Файл будет `target/release/zyabra`. В релизе он называется `zyabra-0.1.13-macos-aarch64`: это Apple Silicon. Подписи нет: при первом открытии система может отказаться запускать файл, пока его не подтвердят в настройках безопасности.
+Сборка на самом Маке: `cargo build --release`. Файл будет `target/release/zyabra`. В релизе он называется `zyabra-0.1.14-macos-aarch64`: это Apple Silicon. Подписи нет: при первом открытии система может отказаться запускать файл, пока его не подтвердят в настройках безопасности.
 
 ## Сборка
 
@@ -92,7 +92,7 @@ cargo test
 cargo build --release
 ```
 
-Готовый файл Windows: `target/release/zyabra.exe`. В релизе он называется `zyabra-0.1.13.exe`: версия стоит после названия. Linux-файл в том же релизе называется `zyabra-0.1.13-linux-x86_64`, файл macOS — `zyabra-0.1.13-macos-aarch64`. Подпись кода нет, SmartScreen может спросить подтверждение при первом запуске Windows-файла.
+Готовый файл Windows: `target/release/zyabra.exe`. В релизе он называется `zyabra-0.1.14.exe`: версия стоит после названия. Linux-файл в том же релизе называется `zyabra-0.1.14-linux-x86_64`, файл macOS — `zyabra-0.1.14-macos-aarch64`. Подпись кода нет, SmartScreen может спросить подтверждение при первом запуске Windows-файла.
 
 ## Словари
 
