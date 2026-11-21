@@ -13,6 +13,9 @@ pub(super) fn apply(rewrite: zyabra::Rewrite) {
     if let Some(term) = rewrite.term {
         send_term(term);
     }
+    for _ in 0..rewrite.spaces {
+        send_unicode(" ");
+    }
     super::switch_layout(rewrite.switch_to);
     if let Some(on) = rewrite.caps {
         set_caps(on);

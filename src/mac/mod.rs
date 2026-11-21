@@ -691,6 +691,9 @@ fn apply(rewrite: Rewrite) {
             Term::Mark(ch) => post_char(ch),
         }
     }
+    for _ in 0..rewrite.spaces {
+        post_key(KEY_SPACE, &[]);
+    }
     if let Some(on) = rewrite.caps {
         set_caps(on);
     }

@@ -319,6 +319,9 @@ fn type_rewrite(app: &mut App, rewrite: &Rewrite) -> Result<(), String> {
     if let Some(term) = rewrite.term {
         type_term(&mut app.keys, rewrite.switch_to, term)?;
     }
+    for _ in 0..rewrite.spaces {
+        app.keys.tap(KeyCode::KEY_SPACE.0, false)?;
+    }
     if let Some(on) = rewrite.caps {
         sync_caps(app, on)?;
     }
