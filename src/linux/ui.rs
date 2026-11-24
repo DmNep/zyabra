@@ -1,5 +1,6 @@
 //! Small X11 window. The compositor draws the title; the body is a core font
-//! so the binary does not need GTK, Cairo, or a bundled typeface.
+//! so the binary does not need GTK, Cairo, or a bundled typeface. The tray icon
+//! is handled separately through the KDE StatusNotifierItem protocol.
 
 use x11rb::connection::Connection;
 use x11rb::protocol::xproto::*;
@@ -19,7 +20,7 @@ const LINES_RU: &[&str] = &[
     "В памяти только текущее слово и одна последняя замена. На диск",
     "набранное не пишется. В интернет программа не ходит: словарь уже",
     "внутри файла. Поля пароля на Linux не отличить, клавиши читаются.",
-    "\"Пауза\" останавливает обработку. Крестик завершает программу.",
+    "\"Пауза\" останавливает обработку.",
 ];
 
 const LINES_EN: &[&str] = &[
@@ -30,7 +31,7 @@ const LINES_EN: &[&str] = &[
     "Only the current word and one last replacement stay in memory.",
     "Nothing is written to disk. The program does not open a network",
     "connection. Linux cannot tell password fields apart, so those",
-    "keys are read too. Pause stops processing. Close quits.",
+    "keys are read too. Pause stops processing.",
 ];
 
 x11rb::atom_manager! {
@@ -45,7 +46,9 @@ x11rb::atom_manager! {
 
 pub enum UiEvent {
     Quit,
+    Close,
     Toggle,
+    TrayActivate,
     Link,
     Help,
 }
@@ -88,23 +91,7 @@ pub fn raise_existing() -> bool {
     let Some(window) = find_zyabra(&conn, root) else {
         return false;
     };
-    let _ = conn.map_window(window);
-    let _ = conn.configure_window(
-        window,
-        &ConfigureWindowAux::new().stack_mode(StackMode::ABOVE),
-    );
-    if let Ok(cookie) = conn.intern_atom(false, b"_NET_ACTIVE_WINDOW") {
-        if let Ok(atom) = cookie.reply() {
-            let event = ClientMessageEvent::new(32, window, atom.atom, [1u32, 0, 0, 0, 0]);
-            let _ = conn.send_event(
-                false,
-                root,
-                EventMask::SUBSTRUCTURE_REDIRECT | EventMask::SUBSTRUCTURE_NOTIFY,
-                event,
-            );
-        }
-    }
-    let _ = conn.flush();
+    let _ = activate_window(&conn, root, window);
     true
 }
 
@@ -125,6 +112,16 @@ impl Display {
             .reply()
             .map_err(xerr)?;
         Ok(reply.focus == self.window)
+    }
+
+    pub fn hide(&mut self) -> Result<(), String> {
+        self.conn.unmap_window(self.window).map_err(xerr)?;
+        self.conn.flush().map_err(xerr)
+    }
+
+    pub fn restore(&mut self, enabled: bool) -> Result<(), String> {
+        activate_window(&self.conn, self.root, self.window)?;
+        self.redraw(enabled)
     }
 
     pub fn poll(&mut self, enabled: bool) -> Result<Option<UiEvent>, String> {
@@ -274,7 +271,7 @@ impl Display {
                     && message.window == self.window
                     && message.data.as_data32()[0] == self.atoms.WM_DELETE_WINDOW =>
             {
-                return Ok(Some(UiEvent::Quit));
+                return Ok(Some(UiEvent::Close));
             }
             Event::Error(_) => {}
             _ => {}
@@ -339,7 +336,7 @@ impl Display {
             }
             let line = line.as_str();
             let y = 28 + (index as i16) * 18;
-            if y > self.height as i16 - 80 {
+            if y > self.height as i16 - 120 {
                 break;
             }
             if self.ascii {
@@ -379,7 +376,6 @@ impl Display {
                     .map_err(xerr)?;
             }
         }
-        let showing_help = self.showing_help;
         for area in self.areas() {
             if area.fill {
                 self.conn
@@ -643,6 +639,26 @@ fn xchars(text: &str) -> Vec<Char2b> {
             byte2: unit as u8,
         })
         .collect()
+}
+
+fn activate_window(conn: &RustConnection, root: Window, window: Window) -> Result<(), String> {
+    let _ = conn.map_window(window);
+    let _ = conn.configure_window(
+        window,
+        &ConfigureWindowAux::new().stack_mode(StackMode::ABOVE),
+    );
+    if let Ok(cookie) = conn.intern_atom(false, b"_NET_ACTIVE_WINDOW") {
+        if let Ok(atom) = cookie.reply() {
+            let event = ClientMessageEvent::new(32, window, atom.atom, [1u32, 0, 0, 0, 0]);
+            let _ = conn.send_event(
+                false,
+                root,
+                EventMask::SUBSTRUCTURE_REDIRECT | EventMask::SUBSTRUCTURE_NOTIFY,
+                event,
+            );
+        }
+    }
+    conn.flush().map_err(xerr)
 }
 
 fn find_zyabra(conn: &RustConnection, root: Window) -> Option<Window> {

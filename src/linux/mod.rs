@@ -7,15 +7,18 @@
 
 mod input;
 mod layout;
+mod tray;
 mod ui;
 
 use std::collections::HashSet;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
+use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use evdev::KeyCode;
+use ksni::blocking::Handle;
 
 use zyabra::{Engine, Force, KeyClass, Rewrite, Script, ShiftPair, StaticDict, Term};
 
@@ -39,11 +42,27 @@ pub fn run(force: Option<Force>) -> Result<(), String> {
         force_key.and_then(force_key_label)
     };
     let display = ui::open(extra_key.as_deref())?;
+    let (tray_tx, tray_rx) = mpsc::channel();
+    let tray = if display.is_some() {
+        match tray::spawn(tray_tx) {
+            Ok(handle) => Some(handle),
+            Err(err) => {
+                eprintln!("Зябра: системный лоток недоступен: {err}");
+                None
+            }
+        }
+    } else {
+        None
+    };
     let layout = layout::detect(display.as_ref().map(|display| (display.conn(), display.root())))?;
     let keys = Keys::open()?;
     let caps = keys.caps_lit();
     if display.is_some() {
-        eprintln!("Зябра слушает клавиатуру. Крестик или \"Выход\" отпускают её.");
+        if tray.is_some() {
+            eprintln!("Зябра слушает клавиатуру. Крестик прячет окно в лоток, \"Выход\" завершает программу.");
+        } else {
+            eprintln!("Зябра слушает клавиатуру. \"Выход\" завершает программу.");
+        }
     } else {
         eprintln!("Зябра слушает клавиатуру без окна. Ctrl+C отпускает её.");
     }
@@ -61,17 +80,45 @@ pub fn run(force: Option<Force>) -> Result<(), String> {
         shift_pair: ShiftPair::new(),
         caps,
         swallowed: HashSet::new(),
+        tray,
+        tray_events: tray_rx,
         _lock: lock,
     };
     loop {
         let enabled = app.enabled;
+        let tray_event = match app.tray_events.try_recv() {
+            Ok(event) => Some(event),
+            Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => None,
+        };
         let event = match app.display.as_mut() {
-            Some(display) => display.poll(enabled)?,
-            None => None,
+            Some(display) => display.poll(enabled)?.or(tray_event),
+            None => tray_event,
         };
         if let Some(event) = event {
             match event {
-                UiEvent::Quit => return Ok(()),
+                UiEvent::Quit => {
+                    shutdown_tray(&mut app);
+                    return Ok(());
+                }
+                UiEvent::Close => {
+                    let hide = app
+                        .tray
+                        .as_ref()
+                        .is_some_and(|tray| !tray.is_closed());
+                    if hide {
+                        if let Some(display) = app.display.as_mut() {
+                            display.hide()?;
+                        }
+                    } else {
+                        shutdown_tray(&mut app);
+                        return Ok(());
+                    }
+                }
+                UiEvent::TrayActivate => {
+                    if let Some(display) = app.display.as_mut() {
+                        display.restore(app.enabled)?;
+                    }
+                }
                 UiEvent::Toggle => {
                     app.enabled = !app.enabled;
                     app.engine.forget();
@@ -110,6 +157,8 @@ struct App {
     shift_pair: ShiftPair,
     caps: bool,
     swallowed: HashSet<u16>,
+    tray: Option<Handle<tray::ZyabraTray>>,
+    tray_events: Receiver<UiEvent>,
     _lock: std::fs::File,
 }
 
@@ -485,6 +534,12 @@ fn is_chord_key(code: u16) -> bool {
 fn dict() -> &'static StaticDict {
     static DICT: OnceLock<StaticDict> = OnceLock::new();
     DICT.get_or_init(StaticDict::load)
+}
+
+fn shutdown_tray(app: &mut App) {
+    if let Some(tray) = app.tray.take() {
+        let _ = tray.shutdown();
+    }
 }
 
 fn open_repo() {

@@ -15,6 +15,8 @@ flate2 = { version = "1", default-features = false, features = ["rust_backend"] 
 
 [target.'cfg(target_os = "linux")'.dependencies]
 evdev = "0.13"
+ksni = { version = "0.3", default-features = false, features = ["async-io", "blocking"] }
+libc = "0.2"
 x11rb = { version = "0.13", features = ["xkb"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
