@@ -1,0 +1,4 @@
+# Let the active seat user read keyboards and create a virtual keyboard.
+# This file must sort before 73-seat-late.rules, which applies the ACL.
+KERNEL=="uinput", TAG+="uaccess"
+SUBSYSTEM=="input", KERNEL=="event*", TAG+="uaccess"

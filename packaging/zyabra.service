@@ -1,0 +1,12 @@
+[Unit]
+Description=Zyabra RU/EN layout switcher
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/zyabra/launch
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

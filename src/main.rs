@@ -12,17 +12,19 @@ mod linux;
 mod mac;
 
 fn main() {
-    let force_key = match zyabra::parse_args(std::env::args().skip(1)) {
+    let (force_key, hidden) = match zyabra::parse_args(std::env::args().skip(1)) {
         Ok(zyabra::Launch::Help) => {
             explain(&zyabra::help_text(&zyabra::installed_path()), false);
             return;
         }
-        Ok(zyabra::Launch::Run(key)) => key,
+        Ok(zyabra::Launch::Run(key, hidden)) => (key, hidden),
         Err(err) => {
             explain(&err, true);
             std::process::exit(1);
         }
     };
+    #[cfg(not(target_os = "linux"))]
+    let _ = hidden;
     #[cfg(windows)]
     {
         if let Err(err) = win::run(force_key) {
@@ -31,7 +33,7 @@ fn main() {
     }
     #[cfg(target_os = "linux")]
     {
-        if let Err(err) = linux::run(force_key) {
+        if let Err(err) = linux::run(force_key, hidden) {
             eprintln!("Зябра: {err}");
             std::process::exit(1);
         }

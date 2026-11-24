@@ -1,0 +1,30 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+    # dpkg has already removed the unit file, so drop the enablement link.
+    rm -f /etc/systemd/user/default.target.wants/zyabra.service
+    rmdir /etc/systemd/user/default.target.wants 2>/dev/null || true
+
+    # Drop user enablement links left by sessions that were not active at removal.
+    getent passwd | while IFS=: read -r name password uid gid gecos home shell; do
+        [ -n "$home" ] && [ -d "$home" ] || continue
+        case "$uid" in
+            ''|*[!0-9]*) continue ;;
+        esac
+        [ "$uid" -ge 1000 ] || continue
+        link="$home/.config/systemd/user/default.target.wants/zyabra.service"
+        [ -L "$link" ] || continue
+        target=$(readlink "$link") || continue
+        case "$target" in
+            */zyabra.service) rm -f "$link" ;;
+        esac
+        rmdir "$(dirname "$link")" 2>/dev/null || true
+    done
+
+    # The shipped udev rule is gone; drop the ACLs it granted.
+    if command -v udevadm >/dev/null 2>&1; then
+        udevadm control --reload-rules || true
+        udevadm trigger --subsystem-match=misc --subsystem-match=input || true
+    fi
+fi

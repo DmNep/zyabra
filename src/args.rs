@@ -1,13 +1,14 @@
 //! Command line. The program stores nothing: a shortcut keeps the key code.
 
 pub const USAGE: &str = "\
-Зябра [--key КОД]
+Зябра [--key КОД] [--hidden]
 Зябра help
 
 КОД — дополнительная клавиша перекладывания, рядом с Pause.
 Десятичное число, шестнадцатеричное с префиксом 0x, или 2sh.
 Windows: виртуальный код клавиши. Linux: код evdev. macOS: код клавиши Mac.
 2sh — второе нажатие Shift подряд, сама клавиша при этом не глотается.
+--hidden — не показывать окно при запуске, только значок в лотке.
 
 Без аргумента работает только Pause. Зябра этот код никуда не записывает.
 ";
@@ -25,6 +26,7 @@ pub fn help_text(program: &str) -> String {
 0x2C на Windows — Print Screen. На Linux та же клавиша — 99.\n\
 На macOS клавиши Pause нет. F15 — 0x71. 0x2C там другая клавиша.\n\
 2sh перекладывает слово со второго Shift подряд, не позже 0,4 с и без другой клавиши между ними. Удержание Shift не считается.\n\
+--hidden оставляет окно свёрнутым: его откроет щелчок по значку в лотке.\n\
 Пока Зябра уже запущена, повторный запуск новый код не подхватывает.\n"
     )
 }
@@ -48,7 +50,8 @@ pub enum Force {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Launch {
-    Run(Option<Force>),
+    /// The flag keeps the Linux window hidden; other platforms ignore it.
+    Run(Option<Force>, bool),
     Help,
 }
 
@@ -58,11 +61,19 @@ where
     S: AsRef<str>,
 {
     let mut force_key = None;
+    let mut hidden = false;
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         let arg = arg.as_ref();
         if arg == "--help" || arg == "-h" || arg.eq_ignore_ascii_case("help") {
             return Ok(Launch::Help);
+        }
+        if arg == "--hidden" {
+            if hidden {
+                return Err(format!("--hidden указан дважды\n\n{USAGE}"));
+            }
+            hidden = true;
+            continue;
         }
         let inline = arg.strip_prefix("--key=");
         if arg == "--key" || inline.is_some() {
@@ -82,7 +93,7 @@ where
         }
         return Err(format!("неизвестный аргумент {arg}\n\n{USAGE}"));
     }
-    Ok(Launch::Run(force_key))
+    Ok(Launch::Run(force_key, hidden))
 }
 
 fn parse_force(text: &str) -> Result<Force, String> {
@@ -118,31 +129,44 @@ mod tests {
 
     #[test]
     fn reads_a_decimal_or_hex_key() {
-        assert_eq!(parse_args(std::iter::empty::<&str>()), Ok(Launch::Run(None)));
+        assert_eq!(
+            parse_args(std::iter::empty::<&str>()),
+            Ok(Launch::Run(None, false))
+        );
         assert_eq!(
             parse_args(["--key", "44"]),
-            Ok(Launch::Run(Some(Force::Key(0x2C))))
+            Ok(Launch::Run(Some(Force::Key(0x2C)), false))
         );
         assert_eq!(
             parse_args(["--key", "0x2C"]),
-            Ok(Launch::Run(Some(Force::Key(44))))
+            Ok(Launch::Run(Some(Force::Key(44)), false))
         );
         assert_eq!(
             parse_args(["--key=0x2c"]),
-            Ok(Launch::Run(Some(Force::Key(44))))
+            Ok(Launch::Run(Some(Force::Key(44)), false))
         );
         assert_eq!(
             parse_args(["--key", "2sh"]),
-            Ok(Launch::Run(Some(Force::DoubleShift)))
+            Ok(Launch::Run(Some(Force::DoubleShift), false))
         );
         assert_eq!(
             parse_args(["--key=2SH"]),
-            Ok(Launch::Run(Some(Force::DoubleShift)))
+            Ok(Launch::Run(Some(Force::DoubleShift), false))
         );
         assert_eq!(parse_args(["--help"]), Ok(Launch::Help));
         assert_eq!(parse_args(["-h"]), Ok(Launch::Help));
         assert_eq!(parse_args(["help"]), Ok(Launch::Help));
         assert_eq!(parse_args(["Help"]), Ok(Launch::Help));
+    }
+
+    #[test]
+    fn hides_the_window() {
+        assert_eq!(parse_args(["--hidden"]), Ok(Launch::Run(None, true)));
+        assert_eq!(
+            parse_args(["--key", "2sh", "--hidden"]),
+            Ok(Launch::Run(Some(Force::DoubleShift), true))
+        );
+        assert!(parse_args(["--hidden", "--hidden"]).is_err());
     }
 
     #[test]

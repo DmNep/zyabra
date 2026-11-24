@@ -1,0 +1,16 @@
+#!/bin/sh
+set -e
+
+# Keep enablement per user: no global default.target link.
+rm -f /etc/systemd/user/default.target.wants/zyabra.service
+rmdir /etc/systemd/user/default.target.wants 2>/dev/null || true
+
+/usr/lib/zyabra/session-unit enable || true
+
+# Apply the uaccess tags now instead of asking for a new login.
+if command -v udevadm >/dev/null 2>&1; then
+    udevadm control --reload-rules || true
+    udevadm trigger --subsystem-match=misc --subsystem-match=input || true
+fi
+
+/usr/lib/zyabra/session-unit start || true

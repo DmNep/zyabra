@@ -1,0 +1,47 @@
+#!/bin/sh
+# The user manager does not always inherit the graphical session variables.
+# Take the missing ones from a process of the same user.
+set -u
+
+names="DISPLAY XAUTHORITY SWAYSOCK HYPRLAND_INSTANCE_SIGNATURE WAYLAND_DISPLAY DBUS_SESSION_BUS_ADDRESS"
+uid=$(id -u)
+filled=" "
+
+missing() {
+    for name in $names; do
+        case "$filled" in
+            *" $name "*) continue ;;
+        esac
+        eval "value=\${$name:-}"
+        [ -n "$value" ] || return 0
+    done
+    return 1
+}
+
+if missing; then
+    for dir in /proc/[0-9]*; do
+        [ -r "$dir/environ" ] || continue
+        [ "$(stat -c %u "$dir" 2>/dev/null)" = "$uid" ] || continue
+        lines=$( (tr '\0' '\n' < "$dir/environ") 2>/dev/null) || continue
+        for name in $names; do
+            case "$filled" in
+                *" $name "*) continue ;;
+            esac
+            eval "value=\${$name:-}"
+            [ -n "$value" ] && continue
+            line=$(printf '%s\n' "$lines" | grep -m1 "^$name=") || continue
+            set -- "$@" "$line"
+            filled="$filled$name "
+        done
+        missing || break
+    done
+fi
+
+if [ -z "${XDG_RUNTIME_DIR:-}" ] && [ -d "/run/user/$uid" ]; then
+    set -- "$@" "XDG_RUNTIME_DIR=/run/user/$uid"
+fi
+if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$uid/bus" ]; then
+    set -- "$@" "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus"
+fi
+
+exec env "$@" /usr/bin/zyabra --hidden

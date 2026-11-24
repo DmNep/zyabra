@@ -73,11 +73,11 @@ pub struct Display {
     bg: u32,
 }
 
-pub fn open(extra_key: Option<&str>) -> Result<Option<Display>, String> {
+pub fn open(extra_key: Option<&str>, hidden: bool) -> Result<Option<Display>, String> {
     if std::env::var_os("DISPLAY").is_none() {
         return Ok(None);
     }
-    Ok(Some(Display::connect(extra_key)?))
+    Ok(Some(Display::connect(extra_key, hidden)?))
 }
 
 pub fn raise_existing() -> bool {
@@ -140,7 +140,7 @@ impl Display {
         self.paint(enabled, true)
     }
 
-    fn connect(extra_key: Option<&str>) -> Result<Self, String> {
+    fn connect(extra_key: Option<&str>, hidden: bool) -> Result<Self, String> {
         let (conn, screen_num) = x11rb::connect(None).map_err(xerr)?;
         let screen = &conn.setup().roots[screen_num];
         let atoms = Atoms::new(&conn).map_err(xerr)?.reply().map_err(xerr)?;
@@ -214,7 +214,9 @@ impl Display {
         }
         conn.change_gc(gc, &ChangeGCAux::new().foreground(text))
             .map_err(xerr)?;
-        conn.map_window(window).map_err(xerr)?;
+        if !hidden {
+            conn.map_window(window).map_err(xerr)?;
+        }
         conn.flush().map_err(xerr)?;
         let (intro_ru, intro_en) = match extra_key {
             Some(name) => (
@@ -546,6 +548,7 @@ Quote the path when it contains a space.
 0x2C on Windows is Print Screen. On Linux it is 99.
 2sh converts on the second Shift, within 0.4 s.
 A second launch ignores a new code.
+--hidden leaves the window hidden until the tray icon is clicked.
 "
         ),
         68,

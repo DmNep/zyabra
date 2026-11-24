@@ -1,0 +1,34 @@
+#!/bin/sh
+# Run a systemctl --user command in every active graphical session.
+set -u
+
+action=$1
+case "$action" in
+    enable|disable|start|stop) ;;
+    *) exit 2 ;;
+esac
+
+command -v loginctl >/dev/null 2>&1 || exit 0
+command -v runuser >/dev/null 2>&1 || exit 0
+
+loginctl list-sessions --no-legend 2>/dev/null | while read -r id _; do
+    [ -n "$id" ] || continue
+    active=$(loginctl show-session "$id" -p Active --value 2>/dev/null || true)
+    kind=$(loginctl show-session "$id" -p Type --value 2>/dev/null || true)
+    uid=$(loginctl show-session "$id" -p User --value 2>/dev/null || true)
+    [ "$active" = "yes" ] || continue
+    case "$kind" in
+        x11|wayland|mir) ;;
+        *) continue ;;
+    esac
+    [ -n "$uid" ] && [ "$uid" != 0 ] || continue
+    runtime="/run/user/$uid"
+    [ -d "$runtime" ] || continue
+    user=$(getent passwd "$uid" | cut -d: -f1)
+    [ -n "$user" ] || continue
+    runuser -u "$user" -- env XDG_RUNTIME_DIR="$runtime" \
+        DBUS_SESSION_BUS_ADDRESS="unix:path=$runtime/bus" \
+        systemctl --user "$action" zyabra.service >/dev/null 2>&1 || true
+done
+
+exit 0

@@ -26,7 +26,7 @@ use input::{Incoming, Keys};
 use layout::Layout;
 use ui::{Display, UiEvent};
 
-pub fn run(force: Option<Force>) -> Result<(), String> {
+pub fn run(force: Option<Force>, hidden: bool) -> Result<(), String> {
     let (force_key, double_shift) = match force {
         Some(Force::Key(code)) if code > u32::from(u16::MAX) => {
             return Err(format!("код клавиши {code} не помещается в evdev"));
@@ -41,7 +41,7 @@ pub fn run(force: Option<Force>) -> Result<(), String> {
     } else {
         force_key.and_then(force_key_label)
     };
-    let display = ui::open(extra_key.as_deref())?;
+    let display = ui::open(extra_key.as_deref(), hidden)?;
     let (tray_tx, tray_rx) = mpsc::channel();
     let tray = if display.is_some() {
         match tray::spawn(tray_tx) {
